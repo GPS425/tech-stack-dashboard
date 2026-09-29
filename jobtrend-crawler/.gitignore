@@ -1,0 +1,18 @@
+.gradle/
+build/
+.idea/
+*.iml
+out/
+
+# 사람인에서 받은 원문은 저장소에 올리지 않는다 (약관 제19조 ④)
+raw/
+saved-html/
+src/test/resources/saved-html/
+.env
+
+# 사람인 파일 (코드에서 안 씀)
+src/test/resources/jobs-view.js
+src/test/resources/robots.txt
+
+# 루트 .gitignore 의 *.jar 예외: Gradle 실행에 필요
+!gradle/wrapper/gradle-wrapper.jar

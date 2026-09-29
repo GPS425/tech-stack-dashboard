@@ -1,0 +1,276 @@
+alias,skill,text_match
+# 표기 → 기술. skill.csv 의 이름은 소문자로 바꿔 자동으로 별칭이 된다(글에서도 찾음). 여기 적은 것이 그보다 우선한다.
+# text_match 0 = 태그 이름으로만 찾고 자격요건·우대 글에서는 찾지 않는다(다른 낱말과 겹치는 짧은 표기).
+# 별칭은 소문자로 저장한다. 앞뒤 경계와 "긴 표기부터" 규칙은 SkillMatcher 에 있다.
+# --- 글에서는 안 찾는 짧은 표기 (설계의 헷갈리는 표기 표)
+go,Go,0
+c,C,0
+r,R,0
+es,Elasticsearch,0
+flex,Flex,0
+뷰,Vue.js,0
+깃,Git,0
+펄,Perl,0
+노드,Node.js,0
+넥스트,Next.js,0
+다트,Dart,0
+# --- 언어
+자바,Java,1
+jdk,Java,1
+javascript,JavaScript,1
+java script,JavaScript,1
+자바스크립트,JavaScript,1
+자바 스크립트,JavaScript,1
+ecmascript,JavaScript,1
+es6,JavaScript,1
+js,JavaScript,1
+vanilla js,JavaScript,1
+타입스크립트,TypeScript,1
+파이썬,Python,1
+코틀린,Kotlin,1
+golang,Go,1
+go언어,Go,1
+go 언어,Go,1
+고랭,Go,1
+c언어,C,1
+c 언어,C,1
+c/c++,C++,1
+cpp,C++,1
+visualc·c++,C++,1
+visual c++,C++,1
+씨샵,C#,1
+스위프트,Swift,1
+objective c,Objective-C,1
+objc,Objective-C,1
+루비,Ruby,1
+스칼라,Scala,1
+r언어,R,1
+r 언어,R,1
+그루비,Groovy,1
+pl-sql,PL/SQL,1
+plsql,PL/SQL,1
+html5,HTML,1
+css3,CSS,1
+쉘스크립트,Shell Script,1
+쉘 스크립트,Shell Script,1
+셸 스크립트,Shell Script,1
+shell,Shell Script,1
+bash,Shell Script,1
+어셈블리,Assembly,1
+액션스크립트,ActionScript,1
+파워빌더,PowerBuilder,1
+pro-c,Pro*C,1
+pro c,Pro*C,1
+matlab,MATLAB,1
+vb,Visual Basic,1
+visualbasic,Visual Basic,1
+러스트,Rust,1
+# --- 프레임워크·라이브러리
+스프링,Spring,1
+spring framework,Spring,1
+스프링 프레임워크,Spring,1
+springboot,Spring Boot,1
+spring-boot,Spring Boot,1
+스프링부트,Spring Boot,1
+스프링 부트,Spring Boot,1
+spring data jpa,JPA,1
+마이바티스,MyBatis,1
+ibatis,iBATIS,1
+nodejs,Node.js,1
+node js,Node.js,1
+node,Node.js,1
+노드js,Node.js,1
+reactjs,React,1
+react.js,React,1
+react js,React,1
+리액트,React,1
+리덕스,Redux,1
+vue,Vue.js,1
+vuejs,Vue.js,1
+vue js,Vue.js,1
+vue3,Vue.js,1
+뷰js,Vue.js,1
+angularjs,Angular,1
+angular.js,Angular,1
+앵귤러,Angular,1
+제이쿼리,jQuery,1
+부트스트랩,Bootstrap,1
+그래프큐엘,GraphQL,1
+장고,Django,1
+플라스크,Flask,1
+루비온레일즈,Ruby on Rails,1
+rails,Ruby on Rails,1
+ruby on rails,Ruby on Rails,1
+.net core,.NET,1
+닷넷,.NET,1
+asp.net core,ASP.NET,1
+유니티,Unity,1
+unity3d,Unity,1
+언리얼,Unreal,1
+unreal engine,Unreal,1
+언리얼 엔진,Unreal,1
+nextjs,Next.js,1
+next js,Next.js,1
+nuxt,Nuxt.js,1
+nuxtjs,Nuxt.js,1
+nest.js,NestJS,1
+nest js,NestJS,1
+express.js,Express,1
+expressjs,Express,1
+fast api,FastAPI,1
+tailwind,Tailwind CSS,1
+tailwindcss,Tailwind CSS,1
+scss,Sass,1
+querydsl,QueryDSL,1
+하이버네이트,Hibernate,1
+spring security,Spring Security,1
+스프링 시큐리티,Spring Security,1
+spring cloud,Spring Cloud,1
+# --- 데이터베이스
+마이에스큐엘,MySQL,1
+마리아디비,MariaDB,1
+postgres,PostgreSQL,1
+postgresql,PostgreSQL,1
+포스트그레스,PostgreSQL,1
+oracledb,Oracle,1
+oracle db,Oracle,1
+오라클,Oracle,1
+ms-sql,MSSQL,1
+ms sql,MSSQL,1
+sql server,MSSQL,1
+mongo,MongoDB,1
+몽고디비,MongoDB,1
+레디스,Redis,1
+elastic search,Elasticsearch,1
+elasticstack,Elasticsearch,1
+elastic stack,Elasticsearch,1
+elk,Elasticsearch,1
+엘라스틱서치,Elasticsearch,1
+opensearch,Elasticsearch,1
+# --- 클라우드·인프라
+amazon web services,AWS,1
+aws ec2,AWS,1
+ec2,AWS,1
+s3,AWS,1
+microsoft azure,Azure,1
+애저,Azure,1
+google cloud,GCP,1
+google cloud platform,GCP,1
+리눅스,Linux,1
+우분투,Ubuntu,1
+센토스,CentOS,1
+# Windows 는 "Windows 환경에서" 처럼 개발 환경을 말할 때가 많아 글에서는 서버 표기만 찾는다
+windows,Windows,0
+windows server,Windows,1
+윈도우 서버,Windows,1
+윈도우서버,Windows,1
+apache http server,Apache,1
+아파치,Apache,1
+엔진엑스,Nginx,1
+apache tomcat,Tomcat,1
+톰캣,Tomcat,1
+apache kafka,Kafka,1
+카프카,Kafka,1
+래빗엠큐,RabbitMQ,1
+# --- 개발·운영 도구
+도커,Docker,1
+docker compose,Docker,1
+k8s,Kubernetes,1
+쿠버네티스,Kubernetes,1
+젠킨스,Jenkins,1
+github,Git,1
+깃허브,Git,1
+gitlab ci,GitLab,1
+깃랩,GitLab,1
+github actions,GitHub Actions,1
+subversion,SVN,1
+메이븐,Maven,1
+그래들,Gradle,1
+웹팩,Webpack,1
+테라폼,Terraform,1
+앤서블,Ansible,1
+argocd,Argo CD,1
+프로메테우스,Prometheus,1
+그라파나,Grafana,1
+셀레니움,Selenium,1
+# --- 모바일
+안드로이드,Android,1
+ios,iOS,1
+플러터,Flutter,1
+react-native,React Native,1
+reactnative,React Native,1
+리액트 네이티브,React Native,1
+리액트네이티브,React Native,1
+# --- AI·데이터
+tensorflow,TensorFlow,1
+텐서플로,TensorFlow,1
+텐서플로우,TensorFlow,1
+pytorch,PyTorch,1
+파이토치,PyTorch,1
+케라스,Keras,1
+판다스,Pandas,1
+apache hadoop,Hadoop,1
+하둡,Hadoop,1
+apache spark,Spark,1
+pyspark,Spark,1
+스파크,Spark,1
+apache airflow,Airflow,1
+에어플로우,Airflow,1
+sklearn,scikit-learn,1
+사이킷런,scikit-learn,1
+랭체인,LangChain,1
+태블로,Tableau,1
+랭그래프,LangGraph,1
+# AI: 'Claude Code·Cursor·Copilot' 은 코딩 도구, 그냥 'Claude·OpenAI·ChatGPT' 는 대부분 'LLM API 사용 경험' 문맥이라 LLM 으로 (9/29 검수)
+# MSA·JWT·RestAPI·NoSQL 같은 설계 개념은 넣지 않는다 (9/29 동희님 결정: AI 개념만)
+claude code,AI 코딩 도구,1
+claudecode,AI 코딩 도구,1
+cursor ai,AI 코딩 도구,1
+커서ai,AI 코딩 도구,1
+cursor,AI 코딩 도구,0
+copilot,AI 코딩 도구,1
+github copilot,AI 코딩 도구,1
+코파일럿,AI 코딩 도구,1
+codex,AI 코딩 도구,1
+claude,LLM,1
+클로드,LLM,1
+openai,LLM,1
+chatgpt,LLM,1
+챗gpt,LLM,1
+gpt,LLM,1
+대규모 언어 모델,LLM,1
+대형 언어 모델,LLM,1
+sllm,LLM,1
+검색 증강 생성,RAG,1
+model context protocol,MCP,1
+# --- 9/29 검수 뒤 추가 (구체적인 도구)
+전자정부 프레임워크,전자정부프레임워크,1
+egovframe,전자정부프레임워크,1
+egov,전자정부프레임워크,1
+zustand,Zustand,1
+react-query,React Query,1
+tanstack query,React Query,1
+threejs,Three.js,1
+three js,Three.js,1
+vector db,Vector DB,1
+vectordb,Vector DB,1
+벡터 db,Vector DB,1
+벡터db,Vector DB,1
+벡터 데이터베이스,Vector DB,1
+naver cloud,NCP,1
+naver cloud platform,NCP,1
+네이버 클라우드,NCP,1
+네이버클라우드,NCP,1
+지라,Jira,1
+피그마,Figma,1
+unrealengine,Unreal,1
+swiftui,Swift,1
+# node exporter 는 모니터링 도구라 Node.js 가 아니다
+node exporter,Prometheus,1
+# --- 기타
+아두이노,Arduino,1
+라즈베리파이,Raspberry Pi,1
+raspberrypi,Raspberry Pi,1
+임베디드리눅스,Embedded Linux,1
+임베디드 리눅스,Embedded Linux,1
+mac os,macOS,1
