@@ -63,6 +63,28 @@ public class RawStore {
         return Files.deleteIfExists(file(postingId));
     }
 
+    public boolean exists(long postingId) {
+        return Files.exists(file(postingId));
+    }
+
+    /** 쓰다가 앱이 죽어 남은 임시 파일(*.tmp) 중 maxAge 보다 오래된 것을 지운다. 지운 수. */
+    public int sweepTemp(java.time.Duration maxAge) {
+        long limit = System.currentTimeMillis() - maxAge.toMillis();
+        int n = 0;
+        try (var files = Files.list(dir)) {
+            for (Path f : (Iterable<Path>) files.filter(f -> f.getFileName().toString().endsWith(".tmp"))::iterator) {
+                try {
+                    if (Files.getLastModifiedTime(f).toMillis() < limit && Files.deleteIfExists(f)) n++;
+                } catch (IOException e) {
+                    // 다음에 다시
+                }
+            }
+        } catch (IOException e) {
+            return n;
+        }
+        return n;
+    }
+
     private Path file(long postingId) {
         return dir.resolve(postingId + ".json");
     }

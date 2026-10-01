@@ -1,6 +1,8 @@
 alias,skill,text_match
 # 표기 → 기술. skill.csv 의 이름은 소문자로 바꿔 자동으로 별칭이 된다(글에서도 찾음). 여기 적은 것이 그보다 우선한다.
-# text_match 0 = 태그 이름으로만 찾고 자격요건·우대 글에서는 찾지 않는다(다른 낱말과 겹치는 짧은 표기).
+# text_match 1 = 태그 이름과 자격요건·우대 글 모두에서 찾는다. 0 = 태그 이름으로만 찾는다(다른 낱말과 겹치는 짧은 표기).
+#   단 0 이라도 SkillMatcher.LIST_ONLY 에 있는 go·c·r·node·cursor 는 글에서 나열됐을 때("Java, Go"·"C 및 C++"·"Embedded C"·"C 프로그래밍"·"React, Node"·"Claude, Cursor")는 찾는다.
+# 0·1 말고 다른 값, 같은 별칭을 두 번(다른 기술로), 다른 기술 이름과 같은 별칭을 적으면 SeedLoader 가 멈춘다.
 # 별칭은 소문자로 저장한다. 앞뒤 경계와 "긴 표기부터" 규칙은 SkillMatcher 에 있다.
 # --- 글에서는 안 찾는 짧은 표기 (설계의 헷갈리는 표기 표)
 go,Go,0
@@ -14,9 +16,15 @@ flex,Flex,0
 노드,Node.js,0
 넥스트,Next.js,0
 다트,Dart,0
+# node 는 "worker node"·"edge node" 같은 쿠버네티스 노드와 겹친다. 글에서는 node.js·nodejs·node js 와, 나열된 "React, Node"(LIST_ONLY)만
+node,Node.js,0
+# rails 는 글에서도 찾는다. "LLM guard rails"·"guard-rails" 는 SkillMatcher.EXCEPT 가 막는다
+rails,Ruby on Rails,1
 # --- 언어
 자바,Java,1
 jdk,Java,1
+openjdk,Java,1
+javafx,Java,1
 javascript,JavaScript,1
 java script,JavaScript,1
 자바스크립트,JavaScript,1
@@ -31,6 +39,7 @@ vanilla js,JavaScript,1
 golang,Go,1
 go언어,Go,1
 go 언어,Go,1
+go lang,Go,1
 고랭,Go,1
 c언어,C,1
 c 언어,C,1
@@ -38,6 +47,7 @@ c/c++,C++,1
 cpp,C++,1
 visualc·c++,C++,1
 visual c++,C++,1
+vc++,C++,1
 씨샵,C#,1
 스위프트,Swift,1
 objective c,Objective-C,1
@@ -78,8 +88,9 @@ spring data jpa,JPA,1
 ibatis,iBATIS,1
 nodejs,Node.js,1
 node js,Node.js,1
-node,Node.js,1
 노드js,Node.js,1
+노드.js,Node.js,1
+노드 js,Node.js,1
 reactjs,React,1
 react.js,React,1
 react js,React,1
@@ -90,6 +101,8 @@ vuejs,Vue.js,1
 vue js,Vue.js,1
 vue3,Vue.js,1
 뷰js,Vue.js,1
+뷰.js,Vue.js,1
+뷰 js,Vue.js,1
 angularjs,Angular,1
 angular.js,Angular,1
 앵귤러,Angular,1
@@ -99,10 +112,11 @@ angular.js,Angular,1
 장고,Django,1
 플라스크,Flask,1
 루비온레일즈,Ruby on Rails,1
-rails,Ruby on Rails,1
+레일즈,Ruby on Rails,1
 ruby on rails,Ruby on Rails,1
 .net core,.NET,1
 닷넷,.NET,1
+ado.net,.NET,1
 asp.net core,ASP.NET,1
 유니티,Unity,1
 unity3d,Unity,1
@@ -111,6 +125,9 @@ unreal engine,Unreal,1
 언리얼 엔진,Unreal,1
 nextjs,Next.js,1
 next js,Next.js,1
+넥스트js,Next.js,1
+넥스트.js,Next.js,1
+넥스트 js,Next.js,1
 nuxt,Nuxt.js,1
 nuxtjs,Nuxt.js,1
 nest.js,NestJS,1
@@ -132,12 +149,16 @@ spring cloud,Spring Cloud,1
 postgres,PostgreSQL,1
 postgresql,PostgreSQL,1
 포스트그레스,PostgreSQL,1
+postgre,PostgreSQL,1
+postgre sql,PostgreSQL,1
+포스트그레,PostgreSQL,1
 oracledb,Oracle,1
 oracle db,Oracle,1
 오라클,Oracle,1
 ms-sql,MSSQL,1
 ms sql,MSSQL,1
 sql server,MSSQL,1
+sqlserver,MSSQL,1
 mongo,MongoDB,1
 몽고디비,MongoDB,1
 레디스,Redis,1
@@ -146,6 +167,7 @@ elasticstack,Elasticsearch,1
 elastic stack,Elasticsearch,1
 elk,Elasticsearch,1
 엘라스틱서치,Elasticsearch,1
+엘라스틱 서치,Elasticsearch,1
 opensearch,Elasticsearch,1
 # --- 클라우드·인프라
 amazon web services,AWS,1
@@ -156,7 +178,11 @@ microsoft azure,Azure,1
 애저,Azure,1
 google cloud,GCP,1
 google cloud platform,GCP,1
+구글 클라우드,GCP,1
+구글클라우드,GCP,1
+구글 클라우드 플랫폼,GCP,1
 리눅스,Linux,1
+유닉스,Unix,1
 우분투,Ubuntu,1
 센토스,CentOS,1
 # Windows 는 "Windows 환경에서" 처럼 개발 환경을 말할 때가 많아 글에서는 서버 표기만 찾는다
@@ -164,8 +190,13 @@ windows,Windows,0
 windows server,Windows,1
 윈도우 서버,Windows,1
 윈도우서버,Windows,1
+# Apache 는 뒤에 다른 영문 낱말이 오면(Apache Flink·Hive·NiFi) 재단 프로젝트라 안 잡는다(SkillMatcher.EXCEPT)
 apache http server,Apache,1
+apache httpd,Apache,1
+httpd,Apache,1
 아파치,Apache,1
+아파치 웹서버,Apache,1
+아파치 웹 서버,Apache,1
 엔진엑스,Nginx,1
 apache tomcat,Tomcat,1
 톰캣,Tomcat,1
@@ -180,6 +211,7 @@ k8s,Kubernetes,1
 젠킨스,Jenkins,1
 github,Git,1
 깃허브,Git,1
+깃헙,Git,1
 gitlab ci,GitLab,1
 깃랩,GitLab,1
 github actions,GitHub Actions,1
@@ -193,6 +225,7 @@ argocd,Argo CD,1
 프로메테우스,Prometheus,1
 그라파나,Grafana,1
 셀레니움,Selenium,1
+와이어샤크,Wireshark,1
 # --- 모바일
 안드로이드,Android,1
 ios,iOS,1
@@ -227,7 +260,12 @@ claude code,AI 코딩 도구,1
 claudecode,AI 코딩 도구,1
 cursor ai,AI 코딩 도구,1
 커서ai,AI 코딩 도구,1
+# cursor 는 DB 커서("Procedure, Function, Cursor")와 겹쳐 글에서는 분명한 표기와, 나열된 "Claude, Cursor"(LIST_ONLY)만
 cursor,AI 코딩 도구,0
+cursor ide,AI 코딩 도구,1
+cursor editor,AI 코딩 도구,1
+cursor 에디터,AI 코딩 도구,1
+커서 ai,AI 코딩 도구,1
 copilot,AI 코딩 도구,1
 github copilot,AI 코딩 도구,1
 코파일럿,AI 코딩 도구,1

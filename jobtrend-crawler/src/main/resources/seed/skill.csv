@@ -1,5 +1,6 @@
 code,name,category
 # 기술 기준 데이터. 앱이 수집을 시작할 때마다 이 파일을 DB 에 맞춘다(이름이 키, 있으면 코드·분류를 고치고 없으면 넣는다).
+# 여기서 지운 기술은 DB 에서 지우지 않고 is_active=0 으로 둔다(posting_skill 이 가리킴). ④ 태그·통계에서 빠진다.
 # code 는 사람인 태그 코드(코드표), 코드표에 없는 기술은 비운다. 분류: LANGUAGE FRAMEWORK DATABASE CLOUD_INFRA DEVOPS_TOOL MOBILE AI_DATA ETC
 # 코드표에서 뺀 것: 직무(80~104·2232 등), 분야·개념(105~183 대부분), 묶음 이름(IaaS·PaaS·SaaS·WAS·NoSQL·OSS·RestAPI·HTTP).
 # 같은 기술의 두 번째 코드(ReactJS 279·HTML5 230·CSS3 210·ECMAScript 216·VisualC·C++ 311)는 태그 이름으로 별칭 표에서 찾는다.
@@ -119,6 +120,7 @@ code,name,category
 193,AIX,CLOUD_INFRA
 288,Solaris,CLOUD_INFRA
 182,Windows,CLOUD_INFRA
+249,macOS,CLOUD_INFRA
 197,Apache,CLOUD_INFRA
 159,Nginx,CLOUD_INFRA
 301,Tomcat,CLOUD_INFRA
@@ -152,6 +154,7 @@ code,name,category
 ,Selenium,DEVOPS_TOOL
 ,Jira,DEVOPS_TOOL
 ,Figma,DEVOPS_TOOL
+,AI 코딩 도구,DEVOPS_TOOL
 # 모바일
 195,Android,MOBILE
 234,iOS,MOBILE
@@ -176,7 +179,6 @@ code,name,category
 ,LLM,AI_DATA
 ,RAG,AI_DATA
 ,MCP,AI_DATA
-,AI 코딩 도구,DEVOPS_TOOL
 # 기타
 319,Arduino,ETC
 186,Raspberry Pi,ETC
@@ -184,5 +186,4 @@ code,name,category
 245,LabVIEW,ETC
 198,ArcGIS,ETC
 274,QGIS,ETC
-249,macOS,ETC
 168,SAP,ETC

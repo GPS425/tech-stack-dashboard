@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * crawler.enabled=true  : 매일 04:00(한국 시간) 한 번. 수집은 서버 한 곳에서만 켠다.
  * crawler.run-once=true : 뜨자마자 한 번 돌리고 앱을 끝낸다(수동 실행·시험). 성공이면 종료 코드 0.
- * 둘 중 하나라도 켜져 있으면, 뜰 때 죽은 앱이 남긴 RUNNING 을 FAILED 로 바꾼다.
+ * crawler.local-only=true 만 주면 사람인에 요청하지 않고 ④·⑤만 한 번 돌리고 끝낸다.
+ * 수집을 켜면 뜰 때와 회차마다 죽은 앱이 남긴 RUNNING 을 FAILED 로 바꾼다(CrawlService.failLeftoverRuns).
  */
 @Component
 public class CrawlScheduler implements ApplicationRunner {
@@ -38,13 +39,15 @@ public class CrawlScheduler implements ApplicationRunner {
             report.export(java.nio.file.Path.of(props.reportFile()));
             System.exit(SpringApplication.exit(context, () -> 0));
         }
-        if (!props.enabled() && !props.runOnce()) {
+        // local-only 만 주면 ④·⑤를 한 번 돌리고 끝낸다(README 의 CRAWLER_LOCAL_ONLY=true). enabled 와 같이 주면 매일 ④·⑤만
+        boolean once = props.runOnce() || (props.localOnly() && !props.enabled());
+        if (!props.enabled() && !once) {
             log.info("수집이 꺼져 있음 (crawler.enabled=false, crawler.run-once=false)");
             return;
         }
         int left = crawl.failLeftoverRuns();
         if (left > 0) log.warn("끝나지 않은 수집 {}건을 FAILED 로 정리함", left);
-        if (props.runOnce()) {
+        if (once) {
             boolean ok = crawl.run();
             System.exit(SpringApplication.exit(context, () -> ok ? 0 : 1));
         }
