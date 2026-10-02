@@ -2,13 +2,16 @@
 -- 크롤러의 job_skill_stat(기본 순위: 1/k 가중)과 같은 기준으로 공고를 고른다:
 --   진행 중 + 상세 받음 + 통계 제외(is_excluded) 아님 + 기술 1개 이상 + 그 직무 하나만 걸린 공고
 -- :jobId 는 job.job_id (API 는 내부 번호만 쓴다)
+-- 이 쿼리는 부를 때마다 계산하므로, 수집이 도는 동안(crawl_run 에 RUNNING)에는 중간 상태가 보일 수 있다.
+-- job_skill_stat(하루 한 번 찍은 값)과 숫자가 조금 다를 수 있다는 점을 화면 문구에 반영한다
 
 WITH base AS (
     SELECT p.posting_id
       FROM posting p
       JOIN posting_job pj ON pj.posting_id = p.posting_id AND pj.job_id = :jobId
      WHERE p.is_closed = 0 AND p.detail_at IS NOT NULL AND p.is_excluded = 0
-       AND EXISTS (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id)
+       AND EXISTS (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id
+                    WHERE ps.posting_id = p.posting_id AND sk.is_active = 1)
        AND (SELECT COUNT(*) FROM posting_job x WHERE x.posting_id = p.posting_id) = 1
 ), total AS (
     SELECT COUNT(*) AS n FROM base
@@ -19,7 +22,7 @@ SELECT s.skill_id, s.name, s.category,
        ROUND(COUNT(DISTINCT ps.posting_id) / NULLIF((SELECT n FROM total), 0), 4) AS ratio
   FROM base b
   JOIN posting_skill ps ON ps.posting_id = b.posting_id
-  JOIN skill s ON s.skill_id = ps.skill_id
+  JOIN skill s ON s.skill_id = ps.skill_id AND s.is_active = 1   -- skill.csv 에서 뺀 기술은 안 셈(job_skill_stat 과 같게)
  GROUP BY s.skill_id, s.name, s.category
  ORDER BY posting_cnt DESC, s.skill_id
  FETCH FIRST 20 ROWS ONLY;
@@ -41,7 +44,7 @@ SELECT s.skill_id, s.name, s.category,
 --    posting_cnt(실제 공고 수) 많은 순으로, "56건 중 21건"처럼 건수로만. 순위 번호와 % 는 보여 주지 않는다.
 --    SELECT s.name, st.posting_cnt, st.job_total
 --      FROM job_skill_stat st JOIN skill s ON s.skill_id = st.skill_id
---     WHERE st.calc_date = :calcDate AND st.job_id = :jobId
+--     WHERE st.calc_date = :calcDate AND st.job_id = :jobId     -- :calcDate = (SELECT MAX(calc_date) FROM job_skill_stat)
 --     ORDER BY st.posting_cnt DESC, st.rank_no
 --     FETCH FIRST 5 ROWS ONLY;
 -- 3. 100건 근처에서 날마다 모드가 바뀌지 않게 켜는 기준 100, 끄는 기준 80 (또는 최근 7일 평균).

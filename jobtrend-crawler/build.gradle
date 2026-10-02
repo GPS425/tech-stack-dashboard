@@ -29,6 +29,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 저장한 사람인 HTML(커밋하지 않는 폴더). IDE 작업 폴더와 상관없게 절대 경로로 넘긴다
+    systemProperty 'savedHtml.dir', file('src/test/resources/saved-html').absolutePath
+    // -PrequireSavedHtml: 저장한 HTML 이 없으면 건너뛰지 말고 실패
+    def require = findProperty('requireSavedHtml')
+    systemProperty 'savedHtml.require', (require != null && require.toString() != 'false').toString()
 }
 
 tasks.withType(JavaCompile).configureEach {

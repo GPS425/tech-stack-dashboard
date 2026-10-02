@@ -1,5 +1,7 @@
 package com.capstone.jobtrend.crawler;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -7,11 +9,13 @@ import java.util.regex.Pattern;
 
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 /** 목록 HTML → 총 건수와 공고 목록. 요청은 하지 않는다. */
 public class ListPageParser {
 
-    private static final Pattern CSN = Pattern.compile("csn=([^&\"]+)");
+    // "pcsn=" 같은 다른 이름에 걸리지 않게 앞 글자를 본다
+    private static final Pattern CSN = Pattern.compile("(?<![A-Za-z0-9_])csn=([^&#\"']+)");
 
     public record ListItem(
             long postingId,
@@ -29,26 +33,28 @@ public class ListPageParser {
             String postedText       // span.deadlines  예: 13일 전 등록, 3시간 전 수정
     ) {}
 
-    public record ListPage(Integer totalCount, List<ListItem> items) {}
+    /** rawItemCount: 걸러 내기 전 .list_item[id^=rec-] 수. 마지막 쪽 판단용(광고 하나 걸렀다고 짧은 쪽으로 보지 않게) */
+    public record ListPage(Integer totalCount, List<ListItem> items, int rawItemCount) {}
 
     public ListPage parse(Document doc) {
         Integer total = null;
         Element totalEl = doc.selectFirst(".total_count em");
         if (totalEl != null) {
             String digits = totalEl.text().replaceAll("[^0-9]", "");
-            if (!digits.isEmpty()) total = Integer.parseInt(digits);
+            if (!digits.isEmpty() && digits.length() <= 9) total = Integer.parseInt(digits);
         }
         // 목록 칸이 없으면 목록이 아닌 화면(차단·점검·잘린 본문)이다. 빈 목록으로 넘기면 전부 마감 처리된다
         // 총 건수(.total_count)는 1쪽에만 있다(9/29 확인). 2쪽부터는 null
         if (doc.selectFirst(".list_body") == null)
             throw new DetailPageParser.ParseFailedException("목록 칸(.list_body) 없음");
         List<ListItem> items = new ArrayList<>();
-        for (Element it : doc.select(".list_item[id^=rec-]")) {
+        Elements raw = doc.select(".list_item[id^=rec-]");
+        for (Element it : raw) {
             // 번호가 숫자가 아닌 항목(광고 등) 하나 때문에 회차 전체가 실패하지 않게 그 항목만 건너뛴다
             if (!it.id().substring("rec-".length()).matches("\\d{1,18}")) continue;
             items.add(item(it));
         }
-        return new ListPage(total, items);
+        return new ListPage(total, items, raw.size());
     }
 
     private ListItem item(Element it) {
@@ -65,7 +71,7 @@ public class ListPageParser {
         String csn = null;
         if (nameEl != null && nameEl.hasAttr("href")) {
             Matcher m = CSN.matcher(nameEl.attr("href"));
-            if (m.find()) csn = m.group(1);
+            if (m.find()) csn = urlDecode(m.group(1));
         }
         if (csn == null && company != null) {
             Element btn = company.selectFirst("button[csn]");
@@ -80,6 +86,15 @@ public class ListPageParser {
         return new ListItem(id, title, companyName, csn, group, size, headhunting, sectors,
                 textOrNull(it, "p.work_place"), textOrNull(it, "p.career"), textOrNull(it, "p.education"),
                 textOrNull(it, ".support_detail .date"), textOrNull(it, ".support_detail .deadlines"));
+    }
+
+    /** href 의 값은 %3D 처럼 인코딩돼 있을 수 있다. 버튼 csn 속성(원래 값)과 같은 키가 되게 푼다. '+'는 base64 글자로 둔다 */
+    static String urlDecode(String v) {
+        try {
+            return URLDecoder.decode(v.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {                 // 잘못된 % 표기면 그대로
+            return v;
+        }
     }
 
     private static String textOrNull(Element root, String css) {

@@ -19,6 +19,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * - posting_cnt = 그 기술이 나온 실제 공고 수, job_total = 그 직무 대상 공고의 실제 수
  *   → ratio 는 posting_cnt / job_total 과 다르다. 화면은 "기술 정보가 있는 공고 job_total 건 중" 으로 쓴다
  * - 순위는 직무 안에서 가중 비율 순, 같으면 실제 공고 수, 그래도 같으면 먼저 등록된 기술. 동률도 번호가 겹치지 않는다
+ *   (1/3 을 세 번 더하면 오라클 NUMBER 로 0.999… 가 되어 1 보다 작다. 가중 합을 소수 10자리로 맞춘 뒤 비교한다)
+ * - CSV 에서 뺀 기술(skill.is_active = 0)은 세지 않는다
  */
 @Service
 public class StatService {
@@ -44,7 +46,8 @@ public class StatService {
                     WITH base AS (
                         SELECT p.posting_id FROM posting p
                          WHERE p.is_closed = 0 AND p.detail_at IS NOT NULL AND p.is_excluded = 0
-                           AND EXISTS (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id)
+                           AND EXISTS (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id
+                                        WHERE ps.posting_id = p.posting_id AND sk.is_active = 1)
                     ), pw AS (
                         SELECT pj.posting_id, pj.job_id, 1 / COUNT(*) OVER (PARTITION BY pj.posting_id) AS w
                           FROM posting_job pj JOIN base b ON b.posting_id = pj.posting_id
@@ -53,12 +56,13 @@ public class StatService {
                     ), js AS (
                         SELECT pw.job_id, ps.skill_id, COUNT(*) AS cnt, SUM(pw.w) AS wcnt
                           FROM pw
-                          JOIN (SELECT DISTINCT posting_id, skill_id FROM posting_skill) ps ON ps.posting_id = pw.posting_id
+                          JOIN (SELECT DISTINCT x.posting_id, x.skill_id FROM posting_skill x
+                                  JOIN skill sk ON sk.skill_id = x.skill_id WHERE sk.is_active = 1) ps ON ps.posting_id = pw.posting_id
                          GROUP BY pw.job_id, ps.skill_id
                     )
                     SELECT :calcDate, js.job_id, js.skill_id, js.cnt, jt.total,
                            ROUND(js.wcnt / jt.wtotal, 4),
-                           ROW_NUMBER() OVER (PARTITION BY js.job_id ORDER BY js.wcnt DESC, js.cnt DESC, js.skill_id)
+                           ROW_NUMBER() OVER (PARTITION BY js.job_id ORDER BY ROUND(js.wcnt, 10) DESC, js.cnt DESC, js.skill_id)
                       FROM js JOIN jt ON jt.job_id = js.job_id
                     """, p);
         });

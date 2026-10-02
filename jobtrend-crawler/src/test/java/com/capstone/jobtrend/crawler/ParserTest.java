@@ -4,8 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.nodes.TextNode;
 import org.junit.jupiter.api.Test;
 
 import com.capstone.jobtrend.crawler.DetailPageParser.PostingDetail;
@@ -13,6 +19,7 @@ import com.capstone.jobtrend.crawler.DetailPageParser.Tag;
 import com.capstone.jobtrend.crawler.ListPageParser.ListItem;
 import com.capstone.jobtrend.crawler.ListPageParser.ListPage;
 
+/** 저장한 실제 HTML 로 보는 시험(없으면 건너뜀, -PrequireSavedHtml 이면 실패). 같은 구조의 합성 HTML 시험은 SyntheticHtmlTest */
 class ParserTest {
 
     private final ListPageParser listParser = new ListPageParser();
@@ -23,6 +30,7 @@ class ParserTest {
         ListPage page = listParser.parse(SavedHtml.load("list-84-p1.html"));
         assertThat(page.totalCount()).isEqualTo(1747);
         assertThat(page.items()).hasSize(100);
+        assertThat(page.rawItemCount()).isGreaterThanOrEqualTo(100);
         assertThat(page.items()).extracting(ListItem::postingId).doesNotHaveDuplicates();
 
         ListItem first = page.items().get(0);
@@ -115,5 +123,48 @@ class ParserTest {
         var viewPage = SavedHtml.load("detail-54749084.html");
         assertThatThrownBy(() -> detailParser.parse(viewPage))
                 .isInstanceOf(DetailPageParser.ParseFailedException.class);
+    }
+
+    /** 예전 요약 값 읽기(strong, 없으면 dd 바로 아래 글). 새 valueOf 가 저장되는 칸 값을 바꾸지 않았는지 비교용 */
+    private static String oldValue(Element dd) {
+        Element strong = dd.selectFirst("strong");
+        String v;
+        if (strong != null) {
+            v = strong.text();
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (TextNode t : dd.textNodes()) sb.append(t.text());
+            v = sb.toString();
+        }
+        return v.replace('\u00a0', ' ').replaceAll("\\s+", " ").trim();
+    }
+
+    private static String squash(String v) {
+        return v == null ? null : v.replaceAll("\\s+", "");
+    }
+
+    @Test
+    void 저장하는_요약_값은_예전_읽기와_같다() throws Exception {
+        // 파일은 검사 밖에서 먼저 읽는다(없으면 건너뜀)
+        List<String> names = List.of("ajax-54749084.html", "ajax-55113543.html", "ajax-55134430.html");
+        List<Document> docs = new ArrayList<>();
+        for (String f : names) docs.add(SavedHtml.load(f));
+        Set<String> stored = Set.of("경력", "학력", "근무형태", "근무지역");   // CrawlService 가 DB 에 넣는 칸
+        int compared = 0;
+        for (int i = 0; i < docs.size(); i++) {
+            Document doc = docs.get(i);
+            PostingDetail d = detailParser.parse(doc);
+            for (Element dl : doc.select(".jv_summary dl")) {
+                Element dt = dl.selectFirst("dt");
+                Element dd = dl.selectFirst("dd");
+                if (dt == null || dd == null || !stored.contains(dt.text().trim())) continue;
+                // 예전 읽기는 <br> 앞뒤 글을 띄어쓰기 없이 붙였다("서울 강남구경기 성남시"). 띄어쓰기만 다른 것은 같은 값으로 본다
+                String now = d.summaryValue(dt.text().trim());
+                assertThat(squash(now)).as(names.get(i) + " " + dt.text() + ": 새 [" + now + "] / 예전 [" + oldValue(dd) + "]")
+                        .isEqualTo(squash(oldValue(dd)));
+                compared++;
+            }
+        }
+        assertThat(compared).isGreaterThanOrEqualTo(docs.size());   // 선택자가 아무것도 못 찾고 통과하지 않게
     }
 }

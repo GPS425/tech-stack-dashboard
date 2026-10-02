@@ -49,12 +49,12 @@ public class ReportService {
                        (SELECT COUNT(*) FROM posting_job pj JOIN posting p ON p.posting_id = pj.posting_id
                          WHERE p.is_closed = 0) AS posting_jobs,
                        (SELECT COUNT(*) FROM posting p WHERE p.is_closed = 0 AND p.detail_at IS NOT NULL
-                           AND NOT EXISTS (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id)) AS no_skill,
+                           AND NOT EXISTS (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1 WHERE ps.posting_id = p.posting_id)) AS no_skill,
                        (SELECT COUNT(*) FROM posting WHERE is_closed = 0 AND is_excluded = 1) AS excluded,
                        (SELECT COUNT(*) FROM posting p WHERE p.is_closed = 0 AND p.detail_at IS NOT NULL AND p.is_excluded = 0
-                           AND EXISTS (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id)) AS stat_base,
-                       (SELECT COUNT(*) FROM skill) AS skills,
-                       (SELECT COUNT(DISTINCT skill_id) FROM posting_skill) AS skills_seen,
+                           AND EXISTS (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1 WHERE ps.posting_id = p.posting_id)) AS stat_base,
+                       (SELECT COUNT(*) FROM skill WHERE is_active = 1) AS skills,
+                       (SELECT COUNT(DISTINCT ps.skill_id) FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1) AS skills_seen,
                        (SELECT COUNT(*) FROM posting_skill) AS posting_skills
                   FROM dual
                 """, none));
@@ -65,14 +65,14 @@ public class ReportService {
                        SUM(CASE WHEN p.is_headhunting = 1 THEN 1 ELSE 0 END) AS headhunting,
                        SUM(CASE WHEN p.career_type IN ('NEW', 'NEW_OR_EXP', 'ANY') THEN 1 ELSE 0 END) AS newcomer_ok,
                        SUM(CASE WHEN p.detail_at IS NOT NULL AND NOT EXISTS
-                                     (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id) THEN 1 ELSE 0 END) AS no_skill,
+                                     (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1 WHERE ps.posting_id = p.posting_id) THEN 1 ELSE 0 END) AS no_skill,
                        SUM(CASE WHEN p.posting_id IS NOT NULL AND (SELECT COUNT(*) FROM posting_job x
                                      WHERE x.posting_id = p.posting_id) = 1 THEN 1 ELSE 0 END) AS only_this_job,
                        SUM(CASE WHEN p.is_excluded = 1 THEN 1 ELSE 0 END) AS excluded,
                        SUM(CASE WHEN p.detail_at IS NOT NULL AND p.is_excluded = 0 AND EXISTS
-                                     (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id) THEN 1 ELSE 0 END) AS stat_base,
+                                     (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1 WHERE ps.posting_id = p.posting_id) THEN 1 ELSE 0 END) AS stat_base,
                        SUM(CASE WHEN p.detail_at IS NOT NULL AND p.is_excluded = 0
-                                 AND EXISTS (SELECT 1 FROM posting_skill ps WHERE ps.posting_id = p.posting_id)
+                                 AND EXISTS (SELECT 1 FROM posting_skill ps JOIN skill sk ON sk.skill_id = ps.skill_id AND sk.is_active = 1 WHERE ps.posting_id = p.posting_id)
                                  AND (SELECT COUNT(*) FROM posting_job x WHERE x.posting_id = p.posting_id) = 1
                                 THEN 1 ELSE 0 END) AS only_this_job_base
                   FROM job j
