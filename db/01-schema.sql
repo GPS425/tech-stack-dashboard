@@ -67,7 +67,9 @@ CREATE TABLE posting (
   CONSTRAINT ck_posting_excluded CHECK (is_excluded IN (0, 1)),
   CONSTRAINT fk_posting_company FOREIGN KEY (company_id) REFERENCES company (company_id)
 );
-CREATE INDEX idx_posting_company ON posting (company_id);           -- 오라클은 외래 키에 인덱스를 자동으로 만들지 않는다
+-- 오라클은 외래 키에 인덱스를 자동으로 만들지 않는다
+-- (주석은 문장 뒤 같은 줄에 두지 않는다: sqlplus 가 세미콜론을 문장 끝으로 못 알아본다)
+CREATE INDEX idx_posting_company ON posting (company_id);
 CREATE INDEX idx_posting_open_posted ON posting (is_closed, posted_on);
 CREATE INDEX idx_posting_open_deadline ON posting (is_closed, deadline_on);
 
