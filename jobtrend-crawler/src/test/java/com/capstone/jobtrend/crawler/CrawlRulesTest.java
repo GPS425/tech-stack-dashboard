@@ -55,6 +55,17 @@ class CrawlRulesTest {
     }
 
     @Test
+    void 두_번_이어서_안_보인_공고를_고르는_조건은_낱말이_붙지_않는다() {
+        // 텍스트 블록·문자열 잇기에서 공백이 빠지면 "ANDNOT" 처럼 붙어 회차가 통째로 실패한다(#26)
+        assertEquals("p.is_closed = 0 AND p.last_seen_at < :prevStart AND NOT EXISTS (SELECT 1 FROM posting_job h"
+                + " WHERE h.posting_id = p.posting_id AND h.job_id IN (:incomplete))", CrawlService.LONG_GONE);
+        String link = CrawlService.LONG_GONE_LINK.replaceAll("\\s+", " ");
+        assertEquals("pj.job_id IN (:complete) AND NVL(pj.last_seen_at, TIMESTAMP '2000-01-01 00:00:00') < :prevStart"
+                + " AND EXISTS (SELECT 1 FROM posting p WHERE p.posting_id = pj.posting_id AND p.is_closed = 0"
+                + " AND p.last_seen_at >= :runStart)", link);
+    }
+
+    @Test
     void 원본_폴더의_오래된_임시_파일만_지운다(@TempDir Path dir) throws IOException {
         RawStore store = new RawStore(dir);
         store.save(1L, new RawStore.Raw(List.of(), List.of("Java"), List.of()));

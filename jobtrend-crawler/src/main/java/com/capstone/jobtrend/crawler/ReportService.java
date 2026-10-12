@@ -110,6 +110,31 @@ public class ReportService {
                  WHERE s.saramin_code IS NULL AND ps.source IN ('REQUIRED', 'PREFERRED')
                  GROUP BY s.name ORDER BY postings DESC FETCH FIRST 20 ROWS ONLY
                 """, none));
+        // 마지막으로 끝까지 받은 회차를 ②의 조건 그대로 다시 세어 본 것(읽기만).
+        // long_gone 이 날마다 불어나면 '목록에서 사라진 공고 닫기'가 멈춘 것이다
+        java.time.LocalDateTime last = CrawlService.previousCompleteRun(db, CrawlService.now());
+        java.time.LocalDateTime prev = CrawlService.previousCompleteRun(db, last);
+        List<Integer> jobIds = db.queryForList("SELECT job_id FROM job", none, Integer.class);
+        MapSqlParameterSource cp = new MapSqlParameterSource("runStart", last).addValue("prevStart", prev)
+                .addValue("incomplete", List.of(-1)).addValue("complete", jobIds.isEmpty() ? List.of(-1) : jobIds);
+        Map<String, Object> preview = new LinkedHashMap<>(db.queryForMap("""
+                SELECT (SELECT COUNT(*) FROM posting p WHERE %s) AS long_gone,
+                       (SELECT COUNT(*) FROM posting p
+                         WHERE p.is_closed = 0 AND p.last_seen_at >= :prevStart AND p.last_seen_at < :runStart) AS first_missing,
+                       (SELECT COUNT(*) FROM posting_job pj WHERE %s) AS long_gone_links
+                  FROM dual
+                """.formatted(CrawlService.LONG_GONE, CrawlService.LONG_GONE_LINK), cp));
+        preview.put("run_start", last.toString());
+        preview.put("prev_start", prev.toString());
+        out.put("close_preview", preview);
+        out.put("close_preview_jobs", db.queryForList("""
+                SELECT j.name, COUNT(*) AS open_postings,
+                       SUM(CASE WHEN p.last_seen_at < :prevStart THEN 1 ELSE 0 END) AS long_gone,
+                       SUM(CASE WHEN p.last_seen_at >= :prevStart AND p.last_seen_at < :runStart THEN 1 ELSE 0 END) AS first_missing
+                  FROM posting p JOIN posting_job pj ON pj.posting_id = p.posting_id JOIN job j ON j.job_id = pj.job_id
+                 WHERE p.is_closed = 0
+                 GROUP BY j.name, j.sort_order ORDER BY j.sort_order
+                """, cp));
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .enable(SerializationFeature.INDENT_OUTPUT);

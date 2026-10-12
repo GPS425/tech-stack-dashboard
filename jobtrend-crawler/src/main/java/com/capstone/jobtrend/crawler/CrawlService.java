@@ -510,6 +510,32 @@ public class CrawlService {
                 new MapSqlParameterSource("codes", props.jobs()), Integer.class);
     }
 
+    // 덜 받은 직무에 걸린 공고는 안 보여도 마감을 미룬다.
+    // 앞 공백 필수: 텍스트 블록은 줄 끝 공백을 지워서 "AND" 와 붙는다
+    static final String HELD =
+            " NOT EXISTS (SELECT 1 FROM posting_job h WHERE h.posting_id = %s.posting_id AND h.job_id IN (:incomplete))";
+    /** 지난번 끝까지 받은 회차(:prevStart)에도 없었던 진행 중 공고 = 두 번 이어서 안 보임. */
+    static final String LONG_GONE = "p.is_closed = 0 AND p.last_seen_at < :prevStart AND" + HELD.formatted("p");
+    /** 진행 중 공고(이번 :runStart 회차에 보임)의 직무 연결 중 지난번 끝까지 받은 회차부터 그 직무 목록에 없던 것. */
+    static final String LONG_GONE_LINK = """
+            pj.job_id IN (:complete)
+               AND NVL(pj.last_seen_at, TIMESTAMP '2000-01-01 00:00:00') < :prevStart
+               AND EXISTS (SELECT 1 FROM posting p
+                            WHERE p.posting_id = pj.posting_id AND p.is_closed = 0 AND p.last_seen_at >= :runStart)""";
+    private static final LocalDateTime NO_PREVIOUS_RUN = LocalDateTime.of(2000, 1, 1, 0, 0);
+
+    /**
+     * before 보다 먼저 시작해 목록을 끝까지 받은 회차의 시작 시각. 없으면 2000-01-01(그보다 오래 안 보인 공고는 없다).
+     * 지금 도는 회차는 뺀다: started_at 이 DB 에 마이크로초로 잘려 들어가 자기 자신이 '이전'으로 잡힐 수 있다.
+     */
+    static LocalDateTime previousCompleteRun(NamedParameterJdbcTemplate db, LocalDateTime before) {
+        java.sql.Timestamp t = db.queryForObject("""
+                SELECT MAX(started_at) FROM crawl_run
+                 WHERE status <> 'RUNNING' AND list_complete = 1 AND started_at < :before
+                """, new MapSqlParameterSource("before", before), java.sql.Timestamp.class);
+        return t == null ? NO_PREVIOUS_RUN : t.toLocalDateTime();
+    }
+
     /** crawl_run.note 에 남길 말이 있으면 돌려준다. */
     String closePostings(LocalDateTime runStart, Set<Integer> incompleteJobs, Counts c) {
         LocalDateTime now = now();
@@ -523,8 +549,7 @@ public class CrawlService {
                 .addValue("complete", complete.isEmpty() ? List.of(-1) : complete)
                 // 덜 받은 직무에 걸린 공고는 안 보여도 마감을 미룬다
                 .addValue("incomplete", incompleteJobs.isEmpty() ? List.of(-1) : List.copyOf(incompleteJobs));
-        // 앞 공백 필수: 텍스트 블록은 줄 끝 공백을 지워서 "AND" 와 붙는다
-        String held = " NOT EXISTS (SELECT 1 FROM posting_job h WHERE h.posting_id = %s.posting_id AND h.job_id IN (:incomplete))";
+        String held = HELD;
         boolean anyComplete = !complete.isEmpty();
         String note = incompleteJobs.isEmpty() ? null : "덜 받은 직무 " + incompleteJobs.size() + "개는 마감을 미룸";
         // 다시 보인 공고는 되살린다(아래 연결 정리가 진행 중 공고만 보므로 먼저). raw 파일을 지운 뒤라면 detail_at 도 비워 ③에서 바로 다시 받는다
@@ -543,6 +568,16 @@ public class CrawlService {
                  WHERE is_closed = 0 AND last_seen_at < :runStart AND deadline_on < :today
                 """, p);
         if (anyComplete) {
+            // 두 번 이어서 안 보인 공고와 연결은 아래 10% 검사 없이 정리한다.
+            // 검사가 이것까지 세면, 한 번 걸려 닫지 못한 공고가 남아 다음 날에도 걸리고 영영 풀리지 않는다(10/7~10/12 엿새 동안 345건이 쌓임).
+            // 그래서 아래 검사가 보는 것은 '이번에 처음 안 보인 공고'뿐이다. 잘못 닫아도 다시 보이면 위에서 되살린다
+            p.addValue("prevStart", previousCompleteRun(db, runStart));
+            int longGone = db.update("UPDATE posting p SET is_closed = 1, closed_at = :now WHERE " + LONG_GONE, p);
+            c.closed += longGone;
+            int longGoneLinks = db.update("DELETE FROM posting_job pj WHERE " + LONG_GONE_LINK, p);
+            if (longGone > 0 || longGoneLinks > 0) {
+                log.info("② 두 번 이어서 안 보인 공고 {}건을 닫고, 직무 연결 {}건을 끊음", longGone, longGoneLinks);
+            }
             // 10% 검사는 끝까지 받은 '설정에 있는' 직무의 공고로만 한다.
             // 설정에서 뺀 직무의 공고는 매일 100% 안 보이므로, 세면 마감 처리가 영영 꺼진다(그 공고는 아래 UPDATE 로 닫힘)
             Map<String, Object> m = db.queryForMap("""
@@ -573,10 +608,10 @@ public class CrawlService {
                     .map(r -> r.get("NAME") + " " + r.get("MISSING") + "/" + r.get("OPEN_BEFORE"))
                     .findFirst().orElse(null);
             if (openBefore > 0 && missing * 10 > openBefore) {
-                note = join(note, "안 보인 공고 " + missing + "/" + openBefore + "건이 10%를 넘어 마감 처리를 건너뜀");
+                note = join(note, "처음 안 보인 공고 " + missing + "/" + openBefore + "건이 10%를 넘어 이번에는 닫지 않음(다음에도 없으면 닫음)");
                 log.warn("② {}", note);
             } else if (badJob != null) {
-                note = join(note, "직무 " + badJob + "건이 10%를 넘어 마감 처리를 건너뜀");
+                note = join(note, "직무 " + badJob + "건이 처음 안 보여 10%를 넘음. 이번에는 닫지 않음(다음에도 없으면 닫음)");
                 log.warn("② {}", note);
             } else {
                 c.closed += db.update("""
@@ -621,7 +656,7 @@ public class CrawlService {
             long links = ((Number) r.get("LINKS")).longValue();
             if (n == 0) continue;
             if (links >= 20 && n * 10 > links) {
-                note = join(note, "직무 " + r.get("NAME") + " 연결 " + n + "/" + links + "건이 10%를 넘어 연결 정리를 건너뜀");
+                note = join(note, "직무 " + r.get("NAME") + " 연결 " + n + "/" + links + "건이 10%를 넘어 이번에는 끊지 않음(다음에도 없으면 끊음)");
                 log.warn("② {}", note);
             } else {
                 safe.add(((Number) r.get("JOB_ID")).intValue());
