@@ -24,7 +24,7 @@ function TrendHeading({ id, icon, title, description, children }) {
   );
 }
 
-function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard }) {
+function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBrowseJobs }) {
   const [selectedJob, setSelectedJob] = useState("all");
   const trend = getMockTechTrend(selectedJob);
   const dateLabel = `${trend.metadata.analysisDate.replaceAll("-", ". ")}.`;
@@ -34,11 +34,10 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard }) {
       <Header
         activePage="trends"
         onHomeAction={() => onNavigateDashboard()}
-        onBrowseJobs={() => onNavigateDashboard("jobs")}
+        onBrowseJobs={onBrowseJobs}
         onEditSkills={onEditSkills}
         onViewAnalysis={onViewAnalysis}
         onViewTrends={() => window.scrollTo(0, 0)}
-        onAccountAction={(action) => onNavigateDashboard(action)}
       />
       <main id="main-content">
         <section className="introduction trend-introduction" aria-labelledby="tech-trend-title">
@@ -114,7 +113,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard }) {
         <section className="trend-related-section" aria-labelledby="trend-related-title">
           <div className="content-container">
             <TrendHeading id="trend-related-title" icon="briefcase" title="관련 채용 공고" description="선택한 직무의 주요 기술스택과 관련된 최신 채용 공고를 확인해보세요.">
-              <button className="trend-all-jobs" type="button" onClick={() => onNavigateDashboard("jobs")}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
+              <button className="trend-all-jobs" type="button" onClick={onBrowseJobs}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
             </TrendHeading>
             <p className="sr-only" role="status" aria-live="polite">{selectedJob === "all" ? "전체 직무" : trend.selectedJob.label} 기준 기술 조합과 관련 공고, {trend.rankingJob.label} 인기 기술을 표시합니다.</p>
             <RecommendedJobs key={selectedJob} jobs={trend.relatedJobs} />

@@ -15,7 +15,7 @@ const formSteps = [
   { step: 3, label: "입력 내용 확인", id: "skills-confirm-step" },
 ];
 
-function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAnalysis, onViewTrends }) {
+function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAnalysis, onViewTrends, onBrowseJobs }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [analysisFeedback, setAnalysisFeedback] = useState("");
   const [selectorVersion, setSelectorVersion] = useState(0);
@@ -75,11 +75,10 @@ function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAna
       <Header
         activePage="skills"
         onHomeAction={() => onNavigateDashboard()}
-        onBrowseJobs={() => onNavigateDashboard("jobs")}
+        onBrowseJobs={onBrowseJobs}
         onEditSkills={() => window.scrollTo(0, 0)}
         onViewAnalysis={onViewAnalysis}
         onViewTrends={onViewTrends}
-        onAccountAction={(action) => onNavigateDashboard(action)}
       />
 
       <main id="main-content">
