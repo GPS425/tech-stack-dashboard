@@ -23,7 +23,7 @@ function SectionHeading({ id, icon, title, description, stacked = false, childre
   );
 }
 
-function SkillAnalysisPage({ profile, onEditSkills, onNavigateDashboard, onViewTrends }) {
+function SkillAnalysisPage({ profile, onEditSkills, onNavigateDashboard, onViewTrends, onBrowseJobs }) {
   const [selectedRole, setSelectedRole] = useState(profile.roleId || "backend");
   const hasProfile = Boolean(profile.roleId || profile.skills.length);
   const analysis = getMockAnalysis(selectedRole, hasProfile ? profile.skills : undefined);
@@ -33,11 +33,10 @@ function SkillAnalysisPage({ profile, onEditSkills, onNavigateDashboard, onViewT
       <Header
         activePage="analysis"
         onHomeAction={() => onNavigateDashboard()}
-        onBrowseJobs={() => onNavigateDashboard("jobs")}
+        onBrowseJobs={onBrowseJobs}
         onEditSkills={onEditSkills}
         onViewAnalysis={() => window.scrollTo(0, 0)}
         onViewTrends={onViewTrends}
-        onAccountAction={(action) => onNavigateDashboard(action)}
       />
       <main id="main-content">
         <section className="introduction analysis-introduction" aria-labelledby="skill-analysis-title">
@@ -94,7 +93,7 @@ function SkillAnalysisPage({ profile, onEditSkills, onNavigateDashboard, onViewT
         <section className="analysis-section" aria-labelledby="analysis-jobs-title">
           <div className="content-container">
             <SectionHeading id="analysis-jobs-title" icon="file" title="내 역량에 맞는 채용 공고" description="지금 바로 지원할 수 있는 추천 채용 공고입니다." stacked>
-              <button className="analysis-all-jobs" type="button" onClick={() => onNavigateDashboard("jobs")}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
+              <button className="analysis-all-jobs" type="button" onClick={onBrowseJobs}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
             </SectionHeading>
             <RecommendedJobs key={analysis.jobId} jobs={analysis.recommendedJobs} />
           </div>

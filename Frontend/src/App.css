@@ -51,35 +51,14 @@
 }
 
 .main-nav a:hover,
-.main-nav button:hover,
-.login-button:hover {
+.main-nav button:hover {
   color: var(--primary);
 }
 
-.account-actions {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  margin-left: auto;
-}
-
-.login-button {
-  color: #526963;
-  font-size: 11px;
-}
-
-.signup-button {
-  min-width: 66px;
-  min-height: 32px;
-  padding: 6px 14px;
-  border-radius: 5px;
-  background: #07825e;
-  color: #fff;
-  font-size: 11px;
-}
-
-.signup-button:hover {
-  background: #066b4e;
+.main-nav [aria-current="page"] {
+  border-bottom: 2px solid var(--primary);
+  color: #07825e;
+  font-weight: 700;
 }
 
 .content-container {
@@ -637,7 +616,6 @@
   .header-inner { flex-wrap: wrap; gap: 14px; padding: 16px 20px 12px; }
   .main-nav { order: 3; justify-content: space-between; width: 100%; gap: 12px; margin-left: 0; }
   .main-nav a, .main-nav button { font-size: 12px; }
-  .account-actions { gap: 16px; }
   .content-container { width: calc(100% - 40px); }
   .introduction { min-height: 288px; padding: 44px 0 52px; }
   .introduction h1 { font-size: 26px; line-height: 34px; letter-spacing: -1px; }
