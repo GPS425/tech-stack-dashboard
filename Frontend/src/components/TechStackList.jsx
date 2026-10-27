@@ -67,7 +67,7 @@ function TechStackList({ stacks, role }) {
           <div className="stack-progress" role="progressbar" aria-label={`${stack.name} 채용공고 사용 비율`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={stack.percentage}>
             <span className="stack-progress-fill" style={{ width: `${stack.percentage}%` }} />
           </div>
-          <span className="stack-percentage">{stack.percentage}%</span>
+          <span className="stack-percentage">{Number(stack.percentage).toFixed(1)}%</span>
         </li>
       ))}
     </ol>
