@@ -19,8 +19,8 @@
 | 2 | GET | /api/summary | 요약 숫자 (공고·기술·직무 수, 기준 날짜) ✅ 구현 |
 | 3 | GET | /api/jobs/{jobId}/skills | 직무별 기술 순위 ✅ 구현 (소규모 직무 규칙은 미구현) |
 | 4 | GET | /api/trends/job-demand | 직무별 공고 수와 비율 ✅ 구현 |
-| 4 | GET | /api/trends/matrix | 직무 × 기술 비율 표 |
-| 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 |
+| 4 | GET | /api/trends/matrix | 직무 × 기술 비율 표 ✅ 구현 |
+| 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 ✅ 구현 |
 | 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 |
 | 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) |
 | 6 | GET | /api/postings/{postingId} | 공고 상세 |
@@ -123,7 +123,7 @@
 - 쓰는 화면: 트렌드 "직무별 채용공고 현황"
 
 ### GET /api/trends/matrix?jobIds=1,23,35&limit=6
-직무 × 기술 비율 표. 기술은 고른 직무들에서 많이 나온 순 `limit` 개.
+직무 × 기술 비율 표. 기술은 고른 직무들의 비율(`percentage`)을 합한 값이 큰 순으로 `limit` 개를 고릅니다(공고가 많은 직무가 순위를 독차지하지 않게 건수가 아니라 비율의 합을 씁니다).
 
 ```json
 {
@@ -133,6 +133,7 @@
 }
 ```
 - 값이 없으면 0
+- `limit` 기본 6, 1~50 (범위 밖이면 400 `INVALID_LIMIT`). `jobs` 는 요청 순서가 아니라 `job.sort_order` 순이고, `values` 는 그 순서를 따릅니다
 - 쓰는 화면: 트렌드 "직무별 핵심 기술 비교"
 
 ### GET /api/trends/combinations?jobId=1&limit=5
@@ -142,6 +143,7 @@
 { "jobId": 1, "items": [ { "skills": ["Java", "Spring Boot"], "postingCount": 241 } ] }
 ```
 - 진행 중 + 통계에 들어간 공고 기준
+- `limit` 기본 5, 1~50 (범위 밖이면 400 `INVALID_LIMIT`). `jobId` 가 없으면 응답의 `jobId` 는 `null`, 없는 직무면 404 `JOB_NOT_FOUND`
 - 쓰는 화면: 트렌드 "기술 조합"
 
 ## 5단계: 역량 분석

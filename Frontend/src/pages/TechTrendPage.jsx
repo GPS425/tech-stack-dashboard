@@ -18,6 +18,8 @@ const ICONS = {
   JavaScript: "javascript", TypeScript: "typescript", "Node.js": "node",
   Docker: "docker", Kubernetes: "kubernetes", Linux: "linux",
 };
+// 위쪽 직무 필터 id -> 실제 직무 이름(/api/jobs 의 name). AI 엔지니어는 DB 에 없는 직무라 넣지 않는다
+const FILTER_JOB_NAME = { backend: "백엔드/서버개발", frontend: "프론트엔드", "data-analyst": "데이터분석가", fullstack: "풀스택" };
 const iconOf = (name) => ICONS[name] || name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 function TrendHeading({ id, icon, title, description, children }) {
@@ -40,6 +42,8 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   const [jobs, setJobs] = useState([]);
   const [rankingJobId, setRankingJobId] = useState(1);
   const [stacks, setStacks] = useState([]);
+  const [matrix, setMatrix] = useState({ calcDate: "", jobs: [], rows: [] });
+  const [combinations, setCombinations] = useState([]);
 
   // 요약 숫자 / 직무별 공고 수 / 직무 목록: 화면이 처음 뜰 때 한 번만 불러온다
   useEffect(() => {
@@ -56,6 +60,28 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
       .catch((e) => { setStacks([]); console.error("기술 순위 불러오기 실패", e); });
   }, [rankingJobId]);
 
+  // 직무별 핵심 기술 비교: 백엔드·프론트엔드·데이터분석가 3개 직무로 고정(임시), 화면이 처음 뜰 때 한 번만 불러온다
+  useEffect(() => {
+    fetch("/api/trends/matrix?jobIds=1,23,35&limit=6")
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then(setMatrix)
+      .catch((e) => { setMatrix({ calcDate: "", jobs: [], rows: [] }); console.error("핵심 기술 비교 불러오기 실패", e); });
+  }, []);
+
+  // 기술 조합 TOP 5: 직무 필터가 바뀔 때마다 다시 불러온다.
+  // filterJobId: null = 전체(jobId 없이), 숫자 = 그 직무, undefined = 직무 목록이 아직 없거나 DB 에 없는 직무(AI 엔지니어)
+  const filterJobId = selectedJob === "all" ? null : jobs.find((item) => item.name === FILTER_JOB_NAME[selectedJob])?.jobId;
+  useEffect(() => {
+    if (filterJobId === undefined) { setCombinations([]); return; }
+    let cancelled = false;   // 필터를 또 바꿔서 이 요청이 낡아지면 결과를 버린다
+    const url = filterJobId === null ? "/api/trends/combinations?limit=5" : `/api/trends/combinations?limit=5&jobId=${filterJobId}`;
+    fetch(url)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((data) => { if (!cancelled) setCombinations((data.items || []).map((item) => ({ skills: item.skills, count: item.postingCount }))); })
+      .catch((e) => { if (!cancelled) setCombinations([]); console.error("기술 조합 불러오기 실패", e); });
+    return () => { cancelled = true; };
+  }, [filterJobId]);
+
   // 수요 1위 직무의 1위 기술 (요약 카드용)
   const [topSkill, setTopSkill] = useState("-");
   const topJobId = demand.items.reduce((best, item) => (!best || item.postingCount > best.postingCount ? item : best), null)?.jobId;
@@ -64,6 +90,11 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
     fetch(`/api/jobs/${topJobId}/skills?limit=1`).then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }).then((data) => setTopSkill(data.items?.[0]?.name || "-")).catch((e) => console.error(e));
   }, [topJobId]);
 
+  // 응답(jobs, rows)을 표 컴포넌트가 기대하는 모양(columns, rows)으로 바꾼다
+  const heatmap = {
+    columns: matrix.jobs.map((job) => ({ id: job.jobId, label: job.name })),
+    rows: matrix.rows.map((row) => ({ skill: row.name, values: row.values })),
+  };
   const jobDemand = demand.items.map((item) => ({ id: item.jobId, label: item.name, count: item.postingCount, percentage: item.percentage }));
   const topDemand = demand.items.reduce((best, item) => (!best || item.postingCount > best.postingCount ? item : best), null);
   const rankingJob = jobs.find((item) => item.jobId === rankingJobId);
@@ -150,11 +181,11 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
           </section>
           <section className="trend-panel" aria-labelledby="trend-heatmap-title">
             <TrendHeading id="trend-heatmap-title" icon="grid" title="직무별 핵심 기술 비교" description="주요 기술이 각 직무에서 얼마나 요구되는지 비교할 수 있습니다." />
-            <JobSkillHeatmap matrix={trend.jobSkillMatrix} selectedJob={selectedJob} />
+            <JobSkillHeatmap matrix={heatmap} selectedJob={selectedJob} />
           </section>
           <section className="trend-panel" aria-labelledby="trend-combination-title">
             <TrendHeading id="trend-combination-title" icon="link" title="기술 조합 TOP 5" description="채용공고에서 함께 언급되는 기술 조합을 확인해보세요." />
-            <TechCombinationList combinations={trend.techCombinations} />
+            <TechCombinationList combinations={combinations} />
           </section>
         </div>
 

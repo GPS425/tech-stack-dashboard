@@ -11,7 +11,7 @@ function JobSkillHeatmap({ matrix, selectedJob }) {
             {matrix.rows.map((row) => (
               <tr key={row.skill}>
                 <th scope="row">{row.skill}</th>
-                {row.values.map((value, index) => <td key={matrix.columns[index].id} className={matrix.columns[index].id === selectedJob ? "is-selected" : undefined} style={{ backgroundColor: `hsl(151 36% ${98 - value * 0.32}%)` }}>{value}%</td>)}
+                {row.values.map((value, index) => <td key={matrix.columns[index].id} className={matrix.columns[index].id === selectedJob ? "is-selected" : undefined} style={{ backgroundColor: `hsl(151 36% ${98 - value * 0.32}%)` }}>{value.toFixed(1)}%</td>)}
               </tr>
             ))}
           </tbody>
