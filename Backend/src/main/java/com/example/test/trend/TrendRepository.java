@@ -2,6 +2,7 @@ package com.example.test.trend;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -120,5 +121,46 @@ public class TrendRepository {
                 params.toArray()
         );
     }
+
+    public record MarketSkills(String skillName,
+                               double ratio){
+    }
+
+    public List<MarketSkills> marketSkills(int jobId){
+        String sql = "SELECT k.name AS skill_name, s.ratio "
+                + "FROM job_skill_stat s "
+                + "JOIN skill k ON k.skill_id = s.skill_id AND k.is_active = 1 "
+                + "WHERE s.job_id = ? "
+                + "AND s.calc_date = (SELECT MAX(calc_date) FROM job_skill_stat) "
+                + "ORDER BY s.ratio DESC, s.skill_id "
+                + "FETCH FIRST 10 ROWS ONLY";
+
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> new MarketSkills(
+                        rs.getString("skill_name"),
+                        rs.getDouble("ratio")),
+                jobId);
+    }
+
+    public record SkillMatch(String alias,
+                             int skillId,
+                             String name){
+    }
+
+    public List<SkillMatch> findSkillsByAlias(List<String> aliases){
+        String placeholders = String.join(",", Collections.nCopies(aliases.size(), "?"));
+        String sql = "SELECT a.alias, k.skill_id, k.name "
+                + "FROM skill_alias a "
+                + "JOIN skill k ON k.skill_id = a.skill_id AND k.is_active = 1 "
+                + "WHERE a.alias IN (" + placeholders + ")";
+
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> new SkillMatch(
+                        rs.getString("alias"),
+                        rs.getInt("skill_id"),
+                        rs.getString("name")),
+                aliases.toArray());
+    }
+
 
 }
