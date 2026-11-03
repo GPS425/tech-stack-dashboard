@@ -21,18 +21,27 @@ public class JobRepository {
                 + "WHERE pj.job_id = j.job_id AND p.is_closed = 0) AS posting_count, "
                 + "NVL((SELECT MAX(s.job_total) FROM job_skill_stat s "
                 + "WHERE s.job_id = j.job_id "
-                + "AND calc_date = (SELECT MAX(calc_date) FROM job_skill_stat)), 0) AS job_total "
+                + "AND calc_date = (SELECT MAX(calc_date) FROM job_skill_stat)), 0) AS job_total, "
+                + "a.avg_total "
                 + "FROM job j "
+                + "LEFT JOIN (SELECT d.job_id, AVG(d.job_total) AS avg_total "
+                + "FROM (SELECT job_id, calc_date, MAX(job_total) AS job_total "
+                + "FROM job_skill_stat "
+                + "WHERE calc_date > (SELECT MAX(calc_date) FROM job_skill_stat) - 7 "
+                + "GROUP BY job_id, calc_date) d "
+                + "GROUP BY d.job_id) a ON a.job_id = j.job_id "
                 + "ORDER BY j.sort_order";
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             int jobTotal = rs.getInt("job_total");
+            Double avgTotal = rs.getObject("avg_total", Double.class);
+            boolean smallSample = avgTotal == null ? jobTotal < 100 : avgTotal < 100;
             return new JobSummary(
                     rs.getInt("job_id"),
                     rs.getString("name"),
                     rs.getInt("posting_count"),
                     jobTotal,
-                    jobTotal < 100);
+                    smallSample);
         });
     }
 

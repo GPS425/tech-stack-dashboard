@@ -42,15 +42,21 @@ public class JobSkillController {
 
         // 최신 통계와 기술순위 조회
         JobSkillRepository.Stat stat = repository.findLatestStat(jobId);
-        List<JobSkillResponse.Item> items = repository.findTopSkills(jobId, limit);
 
         // 통계가 없으면 날짜는 null, 전체 공고 수는 0
         String calcDate = stat == null ? null : stat.calcDate();
         int jobTotal = stat == null ? 0 : stat.jobTotal();
 
+        Double avgTotal = repository.findAvgJobTotal(jobId);
+        boolean smallSample = avgTotal == null ? jobTotal < 100 : avgTotal < 100;
+
+        List<JobSkillResponse.Item> items = smallSample
+                ? repository.findTopSkillsByCount(jobId)
+                : repository.findTopSkills(jobId, limit);
+
         // 응답 조립, 전체 공고가 100건보다 작으면 smallSample을 트루로
         return ResponseEntity.ok(
-                new JobSkillResponse(jobId, name, calcDate, jobTotal, jobTotal < 100, items)
+                new JobSkillResponse(jobId, name, calcDate, jobTotal, smallSample, items)
         );
     }
 

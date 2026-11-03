@@ -8,11 +8,11 @@ public record JobSkillResponse(int jobId,
                                int jobTotal,
                                boolean smallSample,
                                List<Item> items) {
-    public record Item(int rank,
+    public record Item(Integer rank,
                        int skillId,
                        String name,
                        String category,
-                       double percentage,
+                       Double percentage,
                        int postingCount) {
 
     }
