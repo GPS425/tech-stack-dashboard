@@ -17,11 +17,11 @@
 | 2 | GET | /api/jobs | 직무 목록 ✅ 구현 |
 | 2 | GET | /api/skills | 기술 목록·검색 ✅ 구현 |
 | 2 | GET | /api/summary | 요약 숫자 (공고·기술·직무 수, 기준 날짜) ✅ 구현 |
-| 3 | GET | /api/jobs/{jobId}/skills | 직무별 기술 순위 ✅ 구현 (소규모 직무 규칙은 미구현) |
+| 3 | GET | /api/jobs/{jobId}/skills | 직무별 기술 순위 ✅ 구현 |
 | 4 | GET | /api/trends/job-demand | 직무별 공고 수와 비율 ✅ 구현 |
 | 4 | GET | /api/trends/matrix | 직무 × 기술 비율 표 ✅ 구현 |
 | 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 ✅ 구현 |
-| 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 |
+| 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 ✅ 구현 |
 | 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) |
 | 6 | GET | /api/postings/{postingId} | 공고 상세 |
 
@@ -30,7 +30,7 @@
 - **기준 날짜**: 순위·비율은 `job_skill_stat` 의 가장 최근 날짜(`MAX(calc_date)`)를 씁니다. 오늘 날짜로 찾지 않습니다(새벽 수집 전이나 수집이 실패한 날에도 빈 화면이 안 나오게). 응답마다 `calcDate` 를 넣습니다.
 - **비율**: `percentage` 는 0~100, 소수 한 자리(예: 43.6). 여러 직무에 걸린 공고는 직무 수로 나눠 센 가중 비율입니다(`job_skill_stat.ratio × 100`).
 - **건수**: `postingCount` 는 실제 공고 수입니다. 그래서 `postingCount / jobTotal` 과 `percentage` 는 조금 다를 수 있습니다.
-- **작은 직무 (⚠ 아직 미구현 — 현재는 `smallSample` 값만 내려주고 순위·비율은 그대로 줍니다)**: 통계 공고(`jobTotal`)가 100건 미만인 직무는 `smallSample: true` 로 표시하고, 순위·비율 대신 건수만 줍니다(`rank`·`percentage` 는 null, 건수 많은 순 상위 5개). 날마다 오가지 않게 켜는 기준 100, 끄는 기준 80 (`db/api-표시규칙.sql`).
+- **작은 직무**: 통계 공고(`jobTotal`)가 적은 직무는 `smallSample: true` 로 표시하고, 순위·비율 대신 건수만 줍니다(`rank`·`percentage` 는 null, 건수 많은 순 상위 5개). 판단은 **최근 7일 평균 공고 수가 100건 미만**인지로 합니다. 날마다 오가지 않게 하려는 규칙이고, `/api/jobs` 목록과 `/api/jobs/{jobId}/skills` 가 같은 기준을 씁니다 (`db/api-표시규칙.sql`).
 - **쓰지 않는 기술**: `skill.is_active = 0` 인 기술은 어디에도 내보내지 않습니다.
 - **공고 원문**: 약관 때문에 공고 본문 글은 주지 않습니다. 제목·회사·조건·기술 태그와 사람인 원문 주소(`url`)만 줍니다.
 - **날짜 형식**: `2026-10-23`, 시각은 `2026-10-23T04:18:06` (한국 시간).
@@ -40,11 +40,16 @@
 { "status": 404, "code": "JOB_NOT_FOUND", "message": "직무를 찾을 수 없습니다: 999" }
 ```
 
-| 상태 | 언제 |
-|---|---|
-| 400 | 파라미터가 잘못됨 (예: 기술 11개 이상, 모르는 정렬값). 구현: `limit` 범위 밖이면 `INVALID_LIMIT` |
-| 404 | 없는 직무·공고 |
-| 500 | 서버 오류 (DB 연결 등) |
+| 상태 | 코드 | 언제 |
+|---|---|---|
+| 400 | INVALID_LIMIT | `limit` 이 범위 밖 |
+| 400 | INVALID_SKILLS | 기술이 1~10개가 아님 |
+| 400 | MISSING_PARAMETER | 필수 파라미터가 없음 (예: `jobIds`) |
+| 400 | INVALID_PARAMETER | 파라미터 형식이 맞지 않음 (예: 숫자 자리에 글자) |
+| 400 | INVALID_BODY | 요청 본문(JSON)을 읽을 수 없음 |
+| 404 | JOB_NOT_FOUND | 없는 직무 |
+| 405 | METHOD_NOT_ALLOWED | 지원하지 않는 요청 방식 (예: POST 주소를 GET 으로 호출) |
+| 500 | (미정) | 서버 오류 (DB 연결 등). 아직 따로 처리하지 않음 |
 
 ## 구현 방식 (섞어 쓰기)
 

@@ -1,5 +1,6 @@
 package com.example.test.trend;
 
+import com.example.test.common.ApiException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,21 +27,15 @@ public class TrendController {
     public ResponseEntity<?> getMatrix(@RequestParam List<Integer> jobIds,
                                        @RequestParam(defaultValue = "6") int limit) {
         if (limit < 1 || limit > 50) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", 400,
-                    "code", "INVALID_LIMIT",
-                    "message", "limit은 1~50 사이여야 합니다: " + limit
-            ));
+            throw new ApiException(400, "INVALID_LIMIT",
+                    "limit은 1~50 사이여야 합니다: " +limit);
         }
 
         List<MatrixResponse.Job> jobs = repository.findJobs(jobIds);
 
         if (jobs.size() != jobIds.stream().distinct().count()) {
-            return ResponseEntity.status(404).body(Map.of(
-                    "status", 404,
-                    "code", "JOB_NOT_FOUND",
-                    "message", "직무를 찾을 수 없습니다: " + jobIds
-            ));
+            throw new ApiException(404, "JOB_NOT_FOUND",
+                    "직무를 찾을 수 없습니다: " + jobIds);
         }
 
         List<TrendRepository.Cell> cells = repository.findMatrixCells(jobIds, limit);
@@ -74,19 +69,13 @@ public class TrendController {
     public ResponseEntity<?> getCombinations(@RequestParam(required = false) Integer jobId,
                                              @RequestParam(defaultValue = "5") int limit){
         if(limit < 1 || limit > 50){
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", 400,
-                    "code", "INVALID_LIMIT",
-                    "message", "limit은 1~50 사이여야 합니다: " + limit
-            ));
+            throw new ApiException(400, "INVALID_LIMIT",
+                    "limit은 1~50 사이여야 합니다: " + limit);
         }
 
         if(jobId != null && repository.findJobs(List.of(jobId)).isEmpty()){
-            return ResponseEntity.status(404).body(Map.of(
-                    "status", 404,
-                    "code", "JOB_NOT_FOUND",
-                    "message", "직무를 찾을 수 없습니다: " + jobId
-            ));
+            throw new ApiException(404, "JOB_NOT_FOUND",
+                    "직무를 찾을 수 없습니다.: " + jobId);
         }
 
         List<CombinationsResponse.Item> items = repository.findCombinations(jobId, limit);

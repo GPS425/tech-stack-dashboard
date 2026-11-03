@@ -1,5 +1,6 @@
 package com.example.test.analysis;
 
+import com.example.test.common.ApiException;
 import com.example.test.trend.MatrixResponse;
 import com.example.test.trend.TrendRepository;
 import org.springframework.http.ResponseEntity;
@@ -25,21 +26,15 @@ public class AnalysisController {
     public ResponseEntity<?> analzey(@RequestBody AnalysisRequest request) {
 
         if (request.skills().size() < 1 || request.skills().size() > 10) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", 400,
-                    "code", "INVALID_SKILLS",
-                    "message", "기술은 1~10개여야 합니다: " + request.skills().size()
-            ));
+            throw new ApiException(400, "INVALID_SKILLS",
+                    "기술은 1~10개여야 합니다: " + request.skills().size());
         }
 
         List<MatrixResponse.Job> jobs = repository.findJobs(List.of(request.jobId()));
 
         if (jobs.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of(
-                    "status", 404,
-                    "code", "JOB_NOT_FOUND",
-                    "message", "직무를 찾을 수 없습니다: " + request.jobId()
-            ));
+            throw new ApiException(404, "JOB_NOT_FOUND",
+                    "직무를 찾을 수 없습니다: " + request.jobId());
         }
 
         List<String> aliases = request.skills().stream()
