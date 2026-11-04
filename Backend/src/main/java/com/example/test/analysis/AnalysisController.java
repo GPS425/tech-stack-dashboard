@@ -23,7 +23,7 @@ public class AnalysisController {
     }
 
     @PostMapping("/api/analysis")
-    public ResponseEntity<?> analzey(@RequestBody AnalysisRequest request) {
+    public ResponseEntity<?> analyze(@RequestBody AnalysisRequest request) {
 
         if (request.skills().size() < 1 || request.skills().size() > 10) {
             throw new ApiException(400, "INVALID_SKILLS",

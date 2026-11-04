@@ -58,6 +58,13 @@ public class Posting {
     @Column(name = "job_id")
     private Set<Integer> jobIds;
 
+    @ElementCollection
+    @CollectionTable(name = "posting_skill",
+    joinColumns = @JoinColumn(name = "posting_id"))
+    @Column(name = "skill_id")
+    private Set<Integer> skillIds;
+
+
     protected Posting(){
     }
 

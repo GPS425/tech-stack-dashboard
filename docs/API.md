@@ -3,7 +3,7 @@
 - 상태: **초안**. 확정 전에는 주소·칸 이름이 바뀔 수 있습니다.
 - 담당: 백엔드 김동희
 - `jobId` 는 DB 의 `job.job_id`(내부 번호)입니다. 사람인 직무 코드(84 등)가 아닙니다. 예: 백엔드 1, 프론트엔드 23, 데이터분석가 35, 게임개발 37
-- 가정: 직무는 수집하는 **사람인 개발 직무 17개를 그대로** 씁니다(프론트 목업의 8개와 다름 — 팀 결정 대기).
+- 확정: 직무는 수집하는 **사람인 개발 직무 17개를 그대로** 씁니다(프론트 목업의 8개와 다름).
 - 모든 응답은 JSON, 오류는 아래 "공통 규칙"의 오류 모양.
 
 ## 목록
@@ -47,7 +47,12 @@
 | 400 | MISSING_PARAMETER | 필수 파라미터가 없음 (예: `jobIds`) |
 | 400 | INVALID_PARAMETER | 파라미터 형식이 맞지 않음 (예: 숫자 자리에 글자) |
 | 400 | INVALID_BODY | 요청 본문(JSON)을 읽을 수 없음 |
+| 400 | INVALID_PAGE | `page` 가 1 보다 작음 |
+| 400 | INVALID_SIZE | `size` 가 1~50 을 벗어남 |
+| 400 | INVALID_SORT | `sort` 가 `latest`·`deadline` 이 아님 |
+| 400 | INVALID_CAREER | `career` 가 `NEW`·`EXP1`·`EXP3`·`EXP5` 가 아님 |
 | 404 | JOB_NOT_FOUND | 없는 직무 |
+| 404 | POSTING_NOT_FOUND | 없는 공고 |
 | 405 | METHOD_NOT_ALLOWED | 지원하지 않는 요청 방식 (예: POST 주소를 GET 으로 호출) |
 | 500 | (미정) | 서버 오류 (DB 연결 등). 아직 따로 처리하지 않음 |
 
@@ -173,7 +178,7 @@
 }
 ```
 - `marketSkills`: 그 직무 상위 10개 기술
-- `fitScore` (0~100, **계산식은 팀과 정할 것**, 제안): 상위 10개의 비율을 가중치로, 가진 기술의 가중치 합 ÷ 전체 가중치 합 × 100
+- `fitScore` (0~100, 계산식 확정): 상위 10개의 비율을 가중치로, 가진 기술의 가중치 합 ÷ 전체 가중치 합 × 100
 - `prioritySkills`: 부족한 기술 중 비율 높은 순 3개
 - 학습 방향·기간 문구는 프론트가 가진 것을 씁니다(DB 에 없음)
 - 맞는 공고 추천은 `/api/postings?sort=matching&mySkills=…` 를 다시 씁니다
@@ -184,15 +189,15 @@
 ### GET /api/postings
 | 파라미터 | 예 | 뜻 |
 |---|---|---|
-| `q` | `spring` | 제목·회사·기술 이름 검색 |
-| `jobIds` | `1,23` | 직무 (여러 개면 하나라도 걸린 공고) |
-| `skills` | `Java,Docker` | 기술 (모두 가진 공고) |
+| `q` | `spring` | 제목·회사·기술 이름 검색 (대소문자 구분 없음, 부분 일치) |
+| `jobIds` | `1,23` | 직무 번호, 쉼표로 여러 개 (하나라도 걸린 공고) |
+| `skills` | `Java,Docker` | 기술, 쉼표로 여러 개 (모두 가진 공고). 별칭도 됩니다(`스프링` = Spring). 모르는 기술이 하나라도 있으면 빈 결과(`total` 0) |
 | `career` | `NEW` | `NEW`(신입 가능: 신입·신입/경력·경력무관) · `EXP1` · `EXP3` · `EXP5`(최소 경력 N년 이상 요구) |
-| `employment` | `정규직` | 고용 형태 |
-| `region` | `서울` | 시·도 (`region` 칸의 앞 단어) |
-| `sort` | `latest` | `latest`(등록순) · `deadline`(마감 임박순) · `matching`(내 기술 일치순, `mySkills` 필요) |
-| `mySkills` | `Java,Spring` | 일치율 계산용 |
-| `page` · `size` | `1` · `10` | 쪽 (size 최대 50) |
+| `employment` | `정규직` | 고용 형태 (포함 검색: `정규직` 은 "정규직, 계약직" 도 찾음) |
+| `region` | `서울` | 시·도 (`region` 칸이 이 글자로 시작하는 공고) |
+| `sort` | `latest` | `latest`(등록 최신순, 기본) · `deadline`(마감 임박순, 마감일 없는 공고는 맨 뒤) · `matching`(내 기술 일치순, `mySkills` 필요) ⏳ `matching` 은 아직 구현 전 |
+| `mySkills` | `Java,Spring` | 일치율 계산용 ⏳ 아직 구현 전 |
+| `page` · `size` | `1` · `10` | 쪽 (`page` 는 1부터, `size` 는 1~50) |
 
 ```json
 {
@@ -211,20 +216,34 @@
 }
 ```
 - 진행 중 공고만. 통계 제외 공고도 목록에는 나옵니다(통계에서만 뺌)
-- `matchRate`: `mySkills` 를 줬을 때만, 공고 기술 중 가진 비율(0~100)
+- `matchRate`: `mySkills` 를 줬을 때만, 공고 기술 중 가진 비율(0~100). 지금은 항상 `null` (⏳ `mySkills` 구현 전)
+- 조건을 여러 개 주면 모두 만족하는 공고만 나옵니다(AND). 아무것도 안 주면 진행 중 공고 전체
+- 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다
 - 마감 종류 `deadlineType`: DATE(날짜) · UNTIL_FILLED(채용시) · ALWAYS(상시) · ROLLING(수시)
 - 쓰는 화면: 공고 목록, 역량 분석의 추천 공고
 
 ### GET /api/postings/{postingId}
-목록의 한 줄과 같은 모양에 `education`(학력) 을 더합니다. 없는 번호는 404. 마감된 공고는 `closed: true`.
+목록의 한 줄과 같은 모양에 `education`(학력) 과 `closed`(마감 여부) 를 더합니다(`matchRate` 는 없음). 없는 번호는 404 `POSTING_NOT_FOUND`. 마감된 공고도 조회되며 `closed: true` 로 알려 줍니다.
+
+```json
+{
+  "postingId": 55473223, "company": "(주)에스더블유엠", "title": "[SWM] 자율주행 PMO 경력직 모집",
+  "jobs": ["백엔드/서버개발", "프론트엔드"],
+  "career": "경력 4년 이상", "minExperience": 4, "employmentType": "계약직", "region": "경기 안양시 동안구, 군포시, 서울 금천구",
+  "skills": ["AWS", "Azure", "GCP", "Jira"],
+  "postedOn": "2026-11-04", "deadlineOn": "2026-12-03", "deadlineType": "DATE",
+  "url": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55473223",
+  "education": "대졸(4년제) 이상", "closed": false
+}
+```
 
 ---
 
-## 정할 것 (확정 전)
-| 항목 | 지금 가정 | 누가 |
+## 확정 사항
+| 항목 | 확정 내용 | 상태 |
 |---|---|---|
-| 직무 목록 | 사람인 17개 그대로 | 팀장 |
-| 적합도 계산식 | 상위 10개 비율 가중 | 팀 |
-| 직무별 비중 계산 | 직무 수로 나눈 비중(합 100%) | 팀 |
-| 공고 목록 기본 정렬 | 등록순 | 팀 |
-| 회사 로고 자리 | 회사 이름 첫 글자 (로고는 수집 안 함) | 프론트 |
+| 직무 목록 | 사람인 17개 그대로 | 확정 |
+| 적합도(`fitScore`) 계산식 | 상위 10개 비율 가중 | 확정 |
+| 직무별 비중 계산 | 직무 수로 나눈 비중(합 100%) | 확정 |
+| 공고 목록 기본 정렬 | 등록순 (구현 완료) | 확정 |
+| 회사 로고 자리 | 회사 이름 첫 글자 (로고는 수집 안 함) | 확정 |
