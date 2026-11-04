@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Locale;
 
 @Repository
 public class SkillRepository {
@@ -15,7 +16,7 @@ public class SkillRepository {
     }
 
     public List<SkillItem> search(String q, int limit){
-        String keyword = q == null ? "" : q.trim().toLowerCase();
+        String keyword = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
         String pattern = "%" + keyword + "%";
 
         String sql = "SELECT k.skill_id, k.name, k.category FROM skill k "

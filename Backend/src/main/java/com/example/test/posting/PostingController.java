@@ -4,13 +4,14 @@ import com.example.test.common.ApiException;
 import com.example.test.trend.TrendRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,9 +38,9 @@ public class PostingController {
                                            @RequestParam(defaultValue = "latest") String sort,
                                            @RequestParam(defaultValue = "1") int page,
                                            @RequestParam(defaultValue = "10") int size){
-        if(page < 1){
+        if(page < 1 || page > 100000){
             throw new ApiException(400, "INVALID_PAGE",
-                    "page는 1 이상이어야 합니다: " + page);
+                    "page는 1~100000 사이여야 합니다: " + page);
         }
 
         if(size < 1 || size > 50){
@@ -48,28 +49,41 @@ public class PostingController {
         }
 
         if(career != null && !List.of("NEW", "EXP1", "EXP3", "EXP5").contains(career)){
-            throw new ApiException(400, "INVALID_CAREER", "career는 NEW, EXP1, EXP3, EXP5중 하나여야 합니다: " + career);
+            throw new ApiException(400, "INVALID_CAREER", "career는 NEW, EXP1, EXP3, EXP5 중 하나여야 합니다: " + career);
         }
 
-        Sort order;
-        if("latest".equals(sort)){
-            order = Sort.by(Sort.Order.desc("postedOn").nullsLast(), Sort.Order.desc("id"));
-        }else if ("deadline".equals(sort)){
-            order = Sort.by(Sort.Order.asc("deadlineOn").nullsLast(),
-                    Sort.Order.desc("postedOn").nullsLast(),
-                    Sort.Order.desc("id"));
-        }else {
-            throw new ApiException(400, "INVALID_SORT", "sort는 latest, deadline중 하나여야 합니다: " + sort);
+        if(!"latest".equals(sort) && !"deadline".equals(sort)){
+            throw new ApiException(400, "INVALID_SORT", "sort는 latest, deadline 중 하나여야 합니다: " + sort);
         }
 
-        Pageable pageable = PageRequest.of(page - 1, size, order);
+        // "Java," 처럼 끝에 쉼표가 있으면 빈 원소가 생긴다. 빼고 센다
+        List<String> skillNames = skills == null ? List.of()
+                : skills.stream().filter(m -> m != null && !m.isBlank()).map(m -> m.trim()).toList();
+
+        if(jobIds != null && jobIds.size() > 50){
+            throw new ApiException(400, "INVALID_PARAMETER", "jobIds는 최대 50개입니다: " + jobIds.size());
+        }
+
+        if(skillNames.size() > 50){
+            throw new ApiException(400, "INVALID_PARAMETER", "skills는 최대 50개입니다: " + skillNames.size());
+        }
 
         boolean allJobs = jobIds == null || jobIds.isEmpty();
+
+        if(!allJobs && trendRepository.findJobs(jobIds).size() != jobIds.stream().distinct().count()){
+            throw new ApiException(404, "JOB_NOT_FOUND", "직무를 찾을 수 없습니다: " + jobIds);
+        }
+
+        // 정렬은 쿼리의 ORDER BY 가 한다(PostingRepository.search 주석)
+        Pageable pageable = PageRequest.of(page - 1, size);
+        boolean deadlineSort = "deadline".equals(sort);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
         List<Integer> queryJobIds = allJobs ? List.of(-1) : jobIds;
-        String employmentPattern = employment == null || employment.isBlank() ? "%" : "%" + employment + "%";
-        String regionPattern = region == null || region.isBlank() ? "%" : region + "%";
-        String qPattern = q == null || q.isBlank() ? "%" : "%" + q.trim().toLowerCase() + "%";
-        List<String> aliases = skills == null ? List.of() : skills.stream().map(m -> m.trim().toLowerCase()).distinct().toList();
+        String employmentPattern = employment == null || employment.isBlank() ? "%" : "%" + escapeLike(employment.trim()) + "%";
+        String regionPattern = region == null || region.isBlank() ? "%" : escapeLike(region.trim()) + "%";
+        String qPattern = q == null || q.isBlank() ? "%" : "%" + escapeLike(q.trim().toLowerCase(Locale.ROOT)) + "%";
+        List<String> aliases = skillNames.stream().map(m -> m.toLowerCase(Locale.ROOT)).distinct().toList();
         boolean newOnly = "NEW".equals(career);
 
         int minExp = 0;
@@ -98,7 +112,7 @@ public class PostingController {
         }
 
         Page<Posting> result = repository.search(allJobs, queryJobIds, employmentPattern, regionPattern
-                , skillCount, querySkillIds, newOnly, minExp, qPattern, pageable);
+                , skillCount, querySkillIds, newOnly, minExp, qPattern, deadlineSort, today, pageable);
 
         List<Posting> postings = result.getContent();
         List<Long> ids = postings.stream()
@@ -125,16 +139,26 @@ public class PostingController {
         return map;
     }
 
+    // LIKE 의 % _ 를 글자 그대로 찾게 ! 로 이스케이프한다(쿼리는 ESCAPE '!')
+    private String escapeLike(String s){
+        return s.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
     private String careerLabel(Posting p){
-        if("NEW".equals(p.getCareerType())) return "신입";
+        Integer min = p.getExpMin();
+        Integer max = p.getExpMax();
+        if(p.getCareerType() == null) return "미정";
+        else if("NEW".equals(p.getCareerType())) return "신입";
         else if("ANY".equals(p.getCareerType())) return "경력무관";
         else if("NEW_OR_EXP".equals(p.getCareerType())) return "신입, 경력";
         else if ("EXPERIENCED".equals(p.getCareerType())){
-            if(p.getExpMin() == null && p.getExpMax() == null) return "경력";
-            else if (p.getExpMin() != null && p.getExpMax() == null) return "경력 " + p.getExpMin() + "년 이상";
-            else return "경력 " + p.getExpMin() + "~" + p.getExpMax() + "년";
+            if((min == null || min == 0) && max == null) return "경력";
+            else if (max == null) return "경력 " + min + "년 이상";
+            else if (min == null) return "경력 " + max + "년 이하";
+            else if (min.equals(max)) return "경력 " + min + "년";
+            else return "경력 " + min + "~" + max + "년";
         }
-        else return "잘못된 값입니다.";
+        else return "미정";
     }
 
     private PostingItem toItem(Posting p, List<String> jobs, List<String> skills){

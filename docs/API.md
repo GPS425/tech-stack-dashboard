@@ -22,15 +22,19 @@
 | 4 | GET | /api/trends/matrix | 직무 × 기술 비율 표 ✅ 구현 |
 | 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 ✅ 구현 |
 | 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 ✅ 구현 |
-| 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) |
-| 6 | GET | /api/postings/{postingId} | 공고 상세 |
+| 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) ✅ 구현 (`sort=matching`·`mySkills` 는 ⏳) |
+| 6 | GET | /api/postings/{postingId} | 공고 상세 ✅ 구현 |
 
 ## 공통 규칙
 
-- **기준 날짜**: 순위·비율은 `job_skill_stat` 의 가장 최근 날짜(`MAX(calc_date)`)를 씁니다. 오늘 날짜로 찾지 않습니다(새벽 수집 전이나 수집이 실패한 날에도 빈 화면이 안 나오게). 응답마다 `calcDate` 를 넣습니다.
+- **기준 날짜**: 순위·비율은 `job_skill_stat` 의 가장 최근 날짜(`MAX(calc_date)`)를 씁니다. 오늘 날짜로 찾지 않습니다(새벽 수집 전이나 수집이 실패한 날에도 빈 화면이 안 나오게). 통계 표를 쓰는 응답마다 `calcDate` 를 넣습니다.
+- **`calcDate` 가 없는 응답**: `/api/trends/combinations` 와 공고 목록·상세(`/api/postings`, `/api/postings/{postingId}`)는 통계 표가 아니라 지금 공고로 바로 계산하므로 `calcDate` 를 넣지 않습니다.
+- **job-demand 의 날짜와 건수**: `/api/trends/job-demand` 의 `calcDate` 는 통계 날짜(`MAX(calc_date)`)이고, 건수·비율은 지금 진행 중인 공고로 계산합니다.
 - **비율**: `percentage` 는 0~100, 소수 한 자리(예: 43.6). 여러 직무에 걸린 공고는 직무 수로 나눠 센 가중 비율입니다(`job_skill_stat.ratio × 100`).
 - **건수**: `postingCount` 는 실제 공고 수입니다. 그래서 `postingCount / jobTotal` 과 `percentage` 는 조금 다를 수 있습니다.
 - **작은 직무**: 통계 공고(`jobTotal`)가 적은 직무는 `smallSample: true` 로 표시하고, 순위·비율 대신 건수만 줍니다(`rank`·`percentage` 는 null, 건수 많은 순 상위 5개). 판단은 **최근 7일 평균 공고 수가 100건 미만**인지로 합니다. 날마다 오가지 않게 하려는 규칙이고, `/api/jobs` 목록과 `/api/jobs/{jobId}/skills` 가 같은 기준을 씁니다 (`db/api-표시규칙.sql`).
+- **작은 직무의 비율**: `/api/analysis` 의 `fitScore` 와 `/api/trends/matrix` 는 작은 직무여도 가중 비율(`ratio`)을 그대로 씁니다(위 「작은 직무」 규칙은 `/api/jobs`·`/api/jobs/{jobId}/skills` 에만 적용).
+- **여러 개 파라미터**: `jobIds`·`skills` 는 쉼표로 최대 50개. 넘으면 400 `INVALID_PARAMETER`.
 - **쓰지 않는 기술**: `skill.is_active = 0` 인 기술은 어디에도 내보내지 않습니다.
 - **공고 원문**: 약관 때문에 공고 본문 글은 주지 않습니다. 제목·회사·조건·기술 태그와 사람인 원문 주소(`url`)만 줍니다.
 - **날짜 형식**: `2026-10-23`, 시각은 `2026-10-23T04:18:06` (한국 시간).
@@ -43,18 +47,20 @@
 | 상태 | 코드 | 언제 |
 |---|---|---|
 | 400 | INVALID_LIMIT | `limit` 이 범위 밖 |
-| 400 | INVALID_SKILLS | 기술이 1~10개가 아님 |
-| 400 | MISSING_PARAMETER | 필수 파라미터가 없음 (예: `jobIds`) |
-| 400 | INVALID_PARAMETER | 파라미터 형식이 맞지 않음 (예: 숫자 자리에 글자) |
-| 400 | INVALID_BODY | 요청 본문(JSON)을 읽을 수 없음 |
-| 400 | INVALID_PAGE | `page` 가 1 보다 작음 |
+| 400 | INVALID_SKILLS | 기술(`skills`)이 없거나(null) 1~10개가 아니거나, 원소에 null 이 있음 |
+| 400 | MISSING_PARAMETER | 필수 파라미터가 없거나 값이 비어 있음 (예: matrix 의 `jobIds`, `jobIds=`) |
+| 400 | INVALID_PARAMETER | 파라미터 형식이 맞지 않음 (예: 숫자 자리에 글자), `jobIds`·`skills` 가 50개를 넘음 |
+| 400 | INVALID_BODY | 요청 본문(JSON)을 읽을 수 없거나 필수 칸이 없음 (예: 분석의 `jobId`) |
+| 400 | INVALID_PAGE | `page` 가 1~100000 을 벗어남 |
 | 400 | INVALID_SIZE | `size` 가 1~50 을 벗어남 |
 | 400 | INVALID_SORT | `sort` 가 `latest`·`deadline` 이 아님 |
 | 400 | INVALID_CAREER | `career` 가 `NEW`·`EXP1`·`EXP3`·`EXP5` 가 아님 |
 | 404 | JOB_NOT_FOUND | 없는 직무 |
 | 404 | POSTING_NOT_FOUND | 없는 공고 |
+| 404 | NOT_FOUND | 없는 주소 (예: `/api/nothing`) |
 | 405 | METHOD_NOT_ALLOWED | 지원하지 않는 요청 방식 (예: POST 주소를 GET 으로 호출) |
-| 500 | (미정) | 서버 오류 (DB 연결 등). 아직 따로 처리하지 않음 |
+| 415 | UNSUPPORTED_MEDIA_TYPE | 지원하지 않는 `Content-Type` (예: `POST /api/analysis` 에 `application/json` 이 아닌 본문) |
+| 500 | INTERNAL_ERROR | 서버 오류 (DB 연결 등). 메시지는 일반 문구이고, 자세한 내용은 서버 로그에만 남깁니다 |
 
 ## 구현 방식 (섞어 쓰기)
 
@@ -76,7 +82,7 @@
 
 ```json
 [
-  { "jobId": 1, "name": "백엔드/서버개발", "postingCount": 1736, "jobTotal": 1254, "smallSample": false },
+  { "jobId": 1, "name": "백엔드/서버개발", "postingCount": 1736, "jobTotal": 1232, "smallSample": false },
   { "jobId": 37, "name": "게임개발", "postingCount": 115, "jobTotal": 48, "smallSample": true }
 ]
 ```
@@ -132,7 +138,7 @@
 - `percentage`: 공고 하나가 여러 직무에 걸리므로 직무 수로 나눠 센 비중(합 100%). 건수 합은 전체 공고 수보다 큽니다.
 - 쓰는 화면: 트렌드 "직무별 채용공고 현황"
 
-### GET /api/trends/matrix?jobIds=1,23,35&limit=6
+### GET /api/trends/matrix?jobIds=1,23&limit=6
 직무 × 기술 비율 표. 기술은 고른 직무들의 비율(`percentage`)을 합한 값이 큰 순으로 `limit` 개를 고릅니다(공고가 많은 직무가 순위를 독차지하지 않게 건수가 아니라 비율의 합을 씁니다).
 
 ```json
@@ -144,6 +150,7 @@
 ```
 - 값이 없으면 0
 - `limit` 기본 6, 1~50 (범위 밖이면 400 `INVALID_LIMIT`). `jobs` 는 요청 순서가 아니라 `job.sort_order` 순이고, `values` 는 그 순서를 따릅니다
+- `jobIds` 는 필수, 최대 50개. 없거나 비어 있으면 400 `MISSING_PARAMETER`, 50개를 넘으면 400 `INVALID_PARAMETER`, 없는 직무가 하나라도 있으면 404 `JOB_NOT_FOUND`
 - 쓰는 화면: 트렌드 "직무별 핵심 기술 비교"
 
 ### GET /api/trends/combinations?jobId=1&limit=5
@@ -164,6 +171,7 @@
 { "jobId": 1, "skills": ["Java", "Spring", "MySQL"] }
 ```
 - `skills` 1~10개, 이름이나 다른 표기 모두 됨(서버가 `skill_alias` 로 맞춤). 모르는 이름은 `unknownSkills` 로 돌려줌
+- `jobId` 가 없으면 400 `INVALID_BODY`, 없는 직무면 404 `JOB_NOT_FOUND`. `skills` 가 없거나(null) 1~10개가 아니거나 원소에 null 이 있으면 400 `INVALID_SKILLS`
 
 응답:
 ```json
@@ -178,7 +186,7 @@
 }
 ```
 - `marketSkills`: 그 직무 상위 10개 기술
-- `fitScore` (0~100, 계산식 확정): 상위 10개의 비율을 가중치로, 가진 기술의 가중치 합 ÷ 전체 가중치 합 × 100
+- `fitScore` (0~100, 계산식 확정): 상위 10개의 비율을 가중치로, 가진 기술의 가중치 합 ÷ 전체 가중치 합 × 100. 그 직무의 통계가 없어 시장 기술이 없으면 0
 - `prioritySkills`: 부족한 기술 중 비율 높은 순 3개
 - 학습 방향·기간 문구는 프론트가 가진 것을 씁니다(DB 에 없음)
 - 맞는 공고 추천은 `/api/postings?sort=matching&mySkills=…` 를 다시 씁니다
@@ -190,15 +198,18 @@
 | 파라미터 | 예 | 뜻 |
 |---|---|---|
 | `q` | `spring` | 제목·회사·기술 이름 검색 (대소문자 구분 없음, 부분 일치) |
-| `jobIds` | `1,23` | 직무 번호, 쉼표로 여러 개 (하나라도 걸린 공고) |
-| `skills` | `Java,Docker` | 기술, 쉼표로 여러 개 (모두 가진 공고). 별칭도 됩니다(`스프링` = Spring). 모르는 기술이 하나라도 있으면 빈 결과(`total` 0) |
+| `jobIds` | `1,23` | 직무 번호, 쉼표로 최대 50개 (하나라도 걸린 공고). 없는 직무가 하나라도 있으면 404 `JOB_NOT_FOUND` |
+| `skills` | `Java,Docker` | 기술, 쉼표로 최대 50개 (모두 가진 공고). 별칭도 됩니다(`스프링` = Spring). 빈 원소(`Java,` 의 끝)는 무시. 모르는 기술이 하나라도 있으면 빈 결과(`total` 0) |
 | `career` | `NEW` | `NEW`(신입 가능: 신입·신입/경력·경력무관) · `EXP1` · `EXP3` · `EXP5`(최소 경력 N년 이상 요구) |
 | `employment` | `정규직` | 고용 형태 (포함 검색: `정규직` 은 "정규직, 계약직" 도 찾음) |
 | `region` | `서울` | 시·도 (`region` 칸이 이 글자로 시작하는 공고) |
-| `sort` | `latest` | `latest`(등록 최신순, 기본) · `deadline`(마감 임박순, 마감일 없는 공고는 맨 뒤) · `matching`(내 기술 일치순, `mySkills` 필요) ⏳ `matching` 은 아직 구현 전 |
+| `sort` | `latest` | `latest`(등록 최신순, 기본) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치순, `mySkills` 필요) ⏳ `matching` 은 아직 구현 전 |
 | `mySkills` | `Java,Spring` | 일치율 계산용 ⏳ 아직 구현 전 |
-| `page` · `size` | `1` · `10` | 쪽 (`page` 는 1부터, `size` 는 1~50) |
+| `page` · `size` | `1` · `10` | 쪽 (`page` 는 1~100000, `size` 는 1~50) |
 
+- `q`·`employment`·`region` 은 앞뒤 공백을 빼고 찾으며, `%`·`_` 는 글자 그대로 찾습니다
+
+예: `GET /api/postings?jobIds=1&page=1&size=10`
 ```json
 {
   "page": 1, "size": 10, "total": 1736,
@@ -218,7 +229,9 @@
 - 진행 중 공고만. 통계 제외 공고도 목록에는 나옵니다(통계에서만 뺌)
 - `matchRate`: `mySkills` 를 줬을 때만, 공고 기술 중 가진 비율(0~100). 지금은 항상 `null` (⏳ `mySkills` 구현 전)
 - 조건을 여러 개 주면 모두 만족하는 공고만 나옵니다(AND). 아무것도 안 주면 진행 중 공고 전체
-- 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다
+- 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다. `deadline` 정렬에서 마감일이 같으면 `latest` 와 같은 순서(등록 최신순 → `postingId` 큰 순)
+- `deadline` 정렬의 "오늘" 은 한국 날짜이고, 오늘 마감인 공고는 앞쪽(마감일 있음)에 들어갑니다. 마감일이 지났는데 아직 닫히지 않은 공고(크롤러가 닫기 전)는 맨 뒤
+- `career` 문구: `NEW` "신입" · `ANY` "경력무관" · `NEW_OR_EXP` "신입, 경력" · 경력 유형이 없으면 "미정". `EXPERIENCED` 는 최소·최대 경력으로: 둘 다 없거나 최소 0·최대 없음 "경력", 최소만 "경력 N년 이상", 최대만 "경력 N년 이하", 같으면 "경력 N년", 다르면 "경력 a~b년"
 - 마감 종류 `deadlineType`: DATE(날짜) · UNTIL_FILLED(채용시) · ALWAYS(상시) · ROLLING(수시)
 - 쓰는 화면: 공고 목록, 역량 분석의 추천 공고
 

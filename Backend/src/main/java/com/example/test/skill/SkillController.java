@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 @RestController
 public class SkillController {
 
@@ -22,7 +20,7 @@ public class SkillController {
                                        @RequestParam(defaultValue = "200") int limit) {
         if (limit < 1 || limit > 500) {
             throw new ApiException(400, "INVALID_LIMIT",
-                    "limit은 1~50 사이여야 합니다: " + limit);
+                    "limit은 1~500 사이여야 합니다: " + limit);
         }
         return ResponseEntity.ok(repository.search(q, limit));
     }

@@ -31,6 +31,16 @@ public class TrendController {
                     "limit은 1~50 사이여야 합니다: " +limit);
         }
 
+        // jobIds= 처럼 값이 비면 빈 목록으로 들어온다. IN () 이 되지 않게 여기서 막는다
+        if (jobIds.isEmpty()) {
+            throw new ApiException(400, "MISSING_PARAMETER", "필수 파라미터가 없습니다: jobIds");
+        }
+
+        if (jobIds.size() > 50) {
+            throw new ApiException(400, "INVALID_PARAMETER",
+                    "jobIds는 최대 50개입니다: " + jobIds.size());
+        }
+
         List<MatrixResponse.Job> jobs = repository.findJobs(jobIds);
 
         if (jobs.size() != jobIds.stream().distinct().count()) {
@@ -75,7 +85,7 @@ public class TrendController {
 
         if(jobId != null && repository.findJobs(List.of(jobId)).isEmpty()){
             throw new ApiException(404, "JOB_NOT_FOUND",
-                    "직무를 찾을 수 없습니다.: " + jobId);
+                    "직무를 찾을 수 없습니다: " + jobId);
         }
 
         List<CombinationsResponse.Item> items = repository.findCombinations(jobId, limit);

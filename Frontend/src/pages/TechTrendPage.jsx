@@ -43,13 +43,15 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   const [rankingJobId, setRankingJobId] = useState(1);
   const [stacks, setStacks] = useState([]);
   const [matrix, setMatrix] = useState({ calcDate: "", jobs: [], rows: [] });
-  const [combinations, setCombinations] = useState([]);
+  const [jobsStatus, setJobsStatus] = useState("loading");   // 직무 목록: loading · done · error
+  // 기술 조합: 어느 필터(jobId)의 응답인지 함께 둔다. 지금 필터와 다르면 아직 불러오는 중
+  const [combinations, setCombinations] = useState({ jobId: undefined, status: "loading", items: [] });
 
   // 요약 숫자 / 직무별 공고 수 / 직무 목록: 화면이 처음 뜰 때 한 번만 불러온다
   useEffect(() => {
     fetch("/api/summary").then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }).then(setSummary).catch((e) => console.error("요약 불러오기 실패", e));
     fetch("/api/trends/job-demand").then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }).then(setDemand).catch((e) => console.error("직무 수요 불러오기 실패", e));
-    fetch("/api/jobs").then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }).then(setJobs).catch((e) => console.error("직무 목록 불러오기 실패", e));
+    fetch("/api/jobs").then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }).then((data) => { setJobs(data); setJobsStatus("done"); }).catch((e) => { setJobsStatus("error"); console.error("직무 목록 불러오기 실패", e); });
   }, []);
 
   // 인기 기술 TOP 5: 선택한 직무가 바뀔 때마다 다시 불러온다
@@ -71,16 +73,19 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   // 기술 조합 TOP 5: 직무 필터가 바뀔 때마다 다시 불러온다.
   // filterJobId: null = 전체(jobId 없이), 숫자 = 그 직무, undefined = 직무 목록이 아직 없거나 DB 에 없는 직무(AI 엔지니어)
   const filterJobId = selectedJob === "all" ? null : jobs.find((item) => item.name === FILTER_JOB_NAME[selectedJob])?.jobId;
+  // filterJobId 가 undefined 일 때 표에 보일 상태: 직무 목록을 받는 중 / 못 받음 / 받았는데 그 직무가 없음(unavailable)
+  const combinationsBlocked = filterJobId !== undefined ? null : jobsStatus === "loading" ? "loading" : jobsStatus === "error" ? "error" : "unavailable";
   useEffect(() => {
-    if (filterJobId === undefined) { setCombinations([]); return; }
+    if (filterJobId === undefined) return;
     let cancelled = false;   // 필터를 또 바꿔서 이 요청이 낡아지면 결과를 버린다
     const url = filterJobId === null ? "/api/trends/combinations?limit=5" : `/api/trends/combinations?limit=5&jobId=${filterJobId}`;
     fetch(url)
       .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-      .then((data) => { if (!cancelled) setCombinations((data.items || []).map((item) => ({ skills: item.skills, count: item.postingCount }))); })
-      .catch((e) => { if (!cancelled) setCombinations([]); console.error("기술 조합 불러오기 실패", e); });
+      .then((data) => { if (!cancelled) setCombinations({ jobId: filterJobId, status: "done", items: (data.items || []).map((item) => ({ skills: item.skills, count: item.postingCount })) }); })
+      .catch((e) => { if (!cancelled) setCombinations({ jobId: filterJobId, status: "error", items: [] }); console.error("기술 조합 불러오기 실패", e); });
     return () => { cancelled = true; };
   }, [filterJobId]);
+  const combinationsStatus = combinationsBlocked || (combinations.jobId === filterJobId ? combinations.status : "loading");
 
   // 수요 1위 직무의 1위 기술 (요약 카드용)
   const [topSkill, setTopSkill] = useState("-");
@@ -185,7 +190,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
           </section>
           <section className="trend-panel" aria-labelledby="trend-combination-title">
             <TrendHeading id="trend-combination-title" icon="link" title="기술 조합 TOP 5" description="채용공고에서 함께 언급되는 기술 조합을 확인해보세요." />
-            <TechCombinationList combinations={combinations} />
+            <TechCombinationList status={combinationsStatus} combinations={combinationsStatus === "done" ? combinations.items : []} />
           </section>
         </div>
 
