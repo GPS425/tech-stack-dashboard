@@ -81,6 +81,8 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   // 기술 조합 TOP 5: 직무 필터가 바뀔 때마다 다시 불러온다.
   // filterJobId: null = 전체(jobId 없이), 숫자 = 그 직무, undefined = 직무 목록이 아직 없거나 DB 에 없는 직무(AI 엔지니어)
   const filterJobId = selectedJob === "all" ? null : jobs.find((item) => item.name === FILTER_JOB_NAME[selectedJob])?.jobId;
+  // 위쪽 직무 탭을 바꾸면 인기 기술 TOP 5 의 직무도 같이 바꾼다(전체일 때는 그대로 둔다). 아래 드롭다운으로 다른 직무를 직접 고를 수도 있다
+  useEffect(() => { if (typeof filterJobId === "number") setRankingJobId(filterJobId); }, [filterJobId]);
   // filterJobId 가 undefined 일 때 표에 보일 상태: 직무 목록을 받는 중 / 못 받음 / 받았는데 그 직무가 없음(unavailable)
   const combinationsBlocked = filterJobId !== undefined ? null : jobsStatus === "loading" ? "loading" : jobsStatus === "error" ? "error" : "unavailable";
   useEffect(() => {
@@ -163,7 +165,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
           <div className="content-container trend-filter-inner">
             <h2 id="trend-filter-title">직무 필터링</h2>
             <div className="trend-job-filters" role="group" aria-labelledby="trend-filter-title">
-              {trendJobs.map((job) => <button type="button" className={job.id === selectedJob ? "is-selected" : undefined} key={job.id} aria-pressed={job.id === selectedJob} onClick={() => setSelectedJob(job.id)}>{job.label}</button>)}
+              {trendJobs.filter((job) => job.id === "all" || FILTER_JOB_NAME[job.id]).map((job) => <button type="button" className={job.id === selectedJob ? "is-selected" : undefined} key={job.id} aria-pressed={job.id === selectedJob} onClick={() => setSelectedJob(job.id)}>{job.label}</button>)}
             </div>
           </div>
         </section>

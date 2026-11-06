@@ -40,11 +40,11 @@ test("같은 직무 카테고리는 OR, 기술은 AND, 서로 다른 카테고�
 });
 
 test("경력은 최소 연수 이상을 찾으며 경력 무관 공고를 포함한다", () => {
-  for (const [label, years] of [["경력 1년 이상", 1], ["경력 3년 이상", 3], ["경력 5년 이상", 5]]) {
+  for (const [label, years] of [["요구 경력 1년 이상", 1], ["요구 경력 3년 이상", 3], ["요구 경력 5년 이상", 5]]) {
     const results = filterJobs(mockJobs, "", { ...emptyFilters(), experiences: [label] });
     assert.ok(results.every((job) => job.minExperience === null || job.minExperience >= years));
   }
-  const results = filterJobs(mockJobs, "", { ...emptyFilters(), experiences: ["신입", "경력 5년 이상"] });
+  const results = filterJobs(mockJobs, "", { ...emptyFilters(), experiences: ["신입", "요구 경력 5년 이상"] });
   assert.ok(results.every((job) => job.minExperience === null || job.minExperience === 0 || job.minExperience >= 5));
 });
 

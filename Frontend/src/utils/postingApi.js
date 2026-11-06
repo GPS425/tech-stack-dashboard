@@ -3,7 +3,7 @@ import { getToday } from "./jobFilters.js";
 // 공고 API(/api/postings) 요청 주소를 만들고, 응답 한 줄을 화면(JobCard)이 쓰는 모양으로 바꿉니다.
 
 // 화면의 경력 문구 -> API career 값
-export const CAREER_CODES = { "신입": "NEW", "경력 1년 이상": "EXP1", "경력 3년 이상": "EXP3", "경력 5년 이상": "EXP5" };
+export const CAREER_CODES = { "신입": "NEW", "요구 경력 1년 이상": "EXP1", "요구 경력 3년 이상": "EXP3", "요구 경력 5년 이상": "EXP5" };
 
 const DEADLINE_LABELS = { DATE: "채용중", UNTIL_FILLED: "채용시", ALWAYS: "상시", ROLLING: "수시" };
 const LOGO_COLORS = ["#2f6fed", "#008864", "#e8590c", "#7048e8", "#c2255c", "#0b7285", "#5c7cfa", "#2b8a3e"];
