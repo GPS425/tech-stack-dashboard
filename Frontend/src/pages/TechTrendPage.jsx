@@ -4,6 +4,7 @@ import Footer from "../components/Footer.jsx";
 import AnalysisIcon from "../components/AnalysisIcon.jsx";
 import TechStackList from "../components/TechStackList.jsx";
 import RecommendedJobs from "../components/RecommendedJobs.jsx";
+import { useApiJobs } from "../utils/useApiJobs.js";
 import MarketSummary from "../components/MarketSummary.jsx";
 import JobDemandOverview from "../components/JobDemandOverview.jsx";
 import JobSkillHeatmap from "../components/JobSkillHeatmap.jsx";
@@ -34,7 +35,7 @@ function TrendHeading({ id, icon, title, description, children }) {
   );
 }
 
-function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBrowseJobs }) {
+function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBrowseJobs, onViewJob }) {
   const [selectedJob, setSelectedJob] = useState("all");
   const mock = getMockTechTrend(selectedJob);
   const [summary, setSummary] = useState(null);
@@ -46,6 +47,13 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   const [jobsStatus, setJobsStatus] = useState("loading");   // 직무 목록: loading · done · error
   // 기술 조합: 어느 필터(jobId)의 응답인지 함께 둔다. 지금 필터와 다르면 아직 불러오는 중
   const [combinations, setCombinations] = useState({ jobId: undefined, status: "loading", items: [] });
+
+  // 관련 공고: 선택한 직무의 마감 임박 공고 (전체면 직무 조건 없이). 직무 번호는 /api/jobs 에서 이름으로 찾는다
+  const relatedJobName = FILTER_JOB_NAME[selectedJob];
+  const relatedJobId = relatedJobName ? jobs.find((item) => item.name === relatedJobName)?.jobId : undefined;
+  const relatedUrl = selectedJob === "all" ? "/api/postings?size=9&sort=deadline" : relatedJobId !== undefined ? `/api/postings?jobIds=${relatedJobId}&size=9&sort=deadline` : null;
+  const related = useApiJobs(relatedUrl, 3);
+  const relatedLoading = related.loading || (Boolean(relatedJobName) && jobsStatus === "loading");
 
   // 요약 숫자 / 직무별 공고 수 / 직무 목록: 화면이 처음 뜰 때 한 번만 불러온다
   useEffect(() => {
@@ -200,7 +208,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
               <button className="trend-all-jobs" type="button" onClick={onBrowseJobs}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
             </TrendHeading>
             <p className="sr-only" role="status" aria-live="polite">{selectedJob === "all" ? "전체 직무" : trend.selectedJob.label} 기준 기술 조합과 관련 공고, {rankingJob ? rankingJob.name : ""} 인기 기술을 표시합니다.</p>
-            <RecommendedJobs key={selectedJob} jobs={trend.relatedJobs} />
+            <RecommendedJobs jobs={related.jobs} loading={relatedLoading} failed={related.failed} onRetry={related.retry} onViewJob={onViewJob} emptyText="이 직무로 표시할 채용공고가 없습니다." />
           </div>
         </section>
       </main>

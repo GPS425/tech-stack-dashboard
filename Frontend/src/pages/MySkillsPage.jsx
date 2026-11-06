@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import StepCard from "../components/StepCard.jsx";
@@ -6,8 +6,10 @@ import JobSelect from "../components/JobSelect.jsx";
 import SkillSelector from "../components/SkillSelector.jsx";
 import SkillSummary from "../components/SkillSummary.jsx";
 import { mockDashboard } from "../data/mockDashboard.js";
-import { MAX_SELECTED_SKILLS, skillsJobs, popularSkills, skillCatalog, recommendedSkillsByRole } from "../data/mockSkills.js";
+import { fetchJson } from "../utils/postingApi.js";
 import "./MySkillsPage.css";
+
+const MAX_SELECTED_SKILLS = 10;
 
 const formSteps = [
   { step: 1, label: "희망 직무 선택", id: "skills-job-step" },
@@ -19,8 +21,44 @@ function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAna
   const [searchQuery, setSearchQuery] = useState("");
   const [analysisFeedback, setAnalysisFeedback] = useState("");
   const [selectorVersion, setSelectorVersion] = useState(0);
-  const selectedJob = skillsJobs.find((job) => job.id === profile.roleId);
-  const recommendations = recommendedSkillsByRole[profile.roleId] || popularSkills;
+  const [apiJobs, setApiJobs] = useState([]);
+  const [skillCatalog, setSkillCatalog] = useState([]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // 추천·인기 기술: 어느 직무(key)의 응답인지 함께 둔다. 지금 직무와 다르면 아직 불러오는 중
+  const [topSkills, setTopSkills] = useState({ jobId: null, names: [] });
+  const [popular, setPopular] = useState({ jobId: null, names: [] });
+
+  // 직무·기술 목록: 처음 한 번 (직무는 id 를 jobId 문자열로 쓴다)
+  useEffect(() => {
+    fetchJson("/api/jobs").then(setApiJobs).catch((error) => { setLoadFailed(true); console.error("직무 목록 불러오기 실패", error); });
+    fetchJson("/api/skills?limit=500").then((data) => setSkillCatalog(data.map((skill) => skill.name))).catch((error) => { setLoadFailed(true); console.error("기술 목록 불러오기 실패", error); });
+  }, []);
+
+  const skillsJobs = useMemo(() => apiJobs.map((job) => ({
+    id: String(job.jobId),
+    label: job.name,
+    description: `${job.name} 직무입니다. 진행 중인 채용공고는 ${job.postingCount.toLocaleString("ko-KR")}건입니다.`,
+  })), [apiJobs]);
+  const selectedJob = skillsJobs.find((job) => job.id === String(profile.roleId));
+
+  // 인기 기술: 공고가 가장 많은 직무의 상위 기술
+  const biggestJobId = apiJobs.length ? apiJobs.reduce((best, job) => (job.postingCount > best.postingCount ? job : best)).jobId : null;
+  useEffect(() => {
+    if (biggestJobId === null) return undefined;
+    const controller = new AbortController();
+    fetchJson(`/api/jobs/${biggestJobId}/skills?limit=9`, controller.signal).then((data) => setPopular({ jobId: biggestJobId, names: data.items.map((item) => item.name) })).catch((error) => { if (error.name !== "AbortError") console.error("인기 기술 불러오기 실패", error); });
+    return () => controller.abort();
+  }, [biggestJobId]);
+  const popularSkills = popular.jobId === biggestJobId ? popular.names : [];
+
+  // 추천 기술: 선택한 직무의 상위 기술 (직무를 고르기 전에는 인기 기술)
+  useEffect(() => {
+    if (!profile.roleId) return undefined;
+    const controller = new AbortController();
+    fetchJson(`/api/jobs/${profile.roleId}/skills?limit=6`, controller.signal).then((data) => setTopSkills({ jobId: String(profile.roleId), names: data.items.map((item) => item.name) })).catch((error) => { if (error.name !== "AbortError") console.error("추천 기술 불러오기 실패", error); });
+    return () => controller.abort();
+  }, [profile.roleId]);
+  const recommendations = profile.roleId ? (topSkills.jobId === String(profile.roleId) ? topSkills.names : []) : popularSkills;
   const selectionLimitReached = profile.skills.length >= MAX_SELECTED_SKILLS;
   const currentStep = !profile.roleId ? 1 : profile.skills.length === 0 ? 2 : 3;
 
@@ -64,10 +102,8 @@ function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAna
       return;
     }
 
-    // 실제 분석 API를 연결할 때 이 함수에서 아래 입력 정보를 전달합니다.
-    const analysisInput = { jobId: profile.roleId, skills: [...profile.skills] };
+    // 분석 화면이 profile(직무·기술)로 POST /api/analysis 를 호출합니다
     onViewAnalysis();
-    return analysisInput;
   }
 
   return (
@@ -107,6 +143,7 @@ function MySkillsPage({ profile, onProfileChange, onNavigateDashboard, onViewAna
           </nav>
 
           <StepCard id="skills-job-step" step={1} title="희망 직무 선택" description="분석하고 싶은 희망 직무를 선택해주세요.">
+            {loadFailed && <p className="skills-analysis-feedback" role="alert">직무·기술 목록을 불러오지 못했습니다. 서버가 켜져 있는지 확인해 주세요.</p>}
             <div className="skills-job-layout">
               <JobSelect jobs={skillsJobs} value={profile.roleId} onChange={changeJob} />
               <aside className="skills-job-description" aria-labelledby="skills-job-description-title">

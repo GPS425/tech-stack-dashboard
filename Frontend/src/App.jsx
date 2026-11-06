@@ -57,11 +57,12 @@ function App() {
     onViewAnalysis: () => navigate("analysis"),
     onViewTrends: () => navigate("trends"),
     onHomeAction: () => navigate("dashboard"),
+    onViewJob: (job) => navigate("job-detail", { jobId: job.id }),
   };
 
   if (route.view === "health") return <BackendHealthCheck />;
   if (route.view === "jobs") {
-    return <JobsPage {...navigation} profile={skillProfile} state={jobsState} onStateChange={setJobsState} onViewJob={(job) => navigate("job-detail", { jobId: job.id })} />;
+    return <JobsPage {...navigation} profile={skillProfile} state={jobsState} onStateChange={setJobsState} />;
   }
   if (route.view === "job-detail") {
     return <JobDetailPage {...navigation} jobId={route.jobId} profile={skillProfile} />;

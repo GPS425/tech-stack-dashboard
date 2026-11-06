@@ -203,3 +203,17 @@
 @media (prefers-reduced-motion: reduce) {
   .jobs-card { transition: none; }
 }
+
+/* 공고 상세 보강 */
+.jobs-detail-roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; padding: 0; list-style: none; }
+.jobs-detail-roles li { padding: 3px 10px; border-radius: 4px; background: #f0f5f2; color: #4c5e55; font-size: 11px; line-height: 1.5; }
+.jobs-detail-top-actions { margin-top: 16px; }
+.jobs-detail-top-actions .primary-button { display: inline-flex; align-items: center; gap: 4px; }
+.jobs-detail-count { margin-left: 4px; color: var(--jobs-muted); font-size: 12px; font-weight: 400; }
+.jobs-skill-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.jobs-skill-compare h3 { margin: 0 0 10px; font-size: 13px; }
+.jobs-skill-compare h3 strong { color: #008261; }
+.jobs-skill-compare p { color: var(--jobs-muted); font-size: 12px; line-height: 1.7; }
+.jobs-skill-tags--lack > span { background: #fff1ec; color: #c2410c; }
+.jobs-detail-notice { margin-top: 24px; padding: 12px 14px; border-radius: 6px; background: #f6fbf8; color: var(--jobs-muted); font-size: 11px; line-height: 1.7; }
+@media (max-width: 640px) { .jobs-skill-compare { grid-template-columns: minmax(0, 1fr); } }

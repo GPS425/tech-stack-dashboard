@@ -274,3 +274,11 @@
   .analysis-job-heading { flex-wrap: wrap; }
   .analysis-job-match { margin-left: auto; }
 }
+
+.analysis-jobs-note { padding: 28px 0; color: #78867f; font-size: 13px; line-height: 1.7; text-align: center; }
+
+/* 추천·관련 공고 카드 하단 줄 (분석·트렌드 화면 공통) */
+.analysis-job-card .analysis-tags { margin-bottom: 14px; }
+.analysis-job-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+.analysis-job-actions > p { margin: 0; color: #75847f; font-size: 11px; line-height: 18px; }
+.analysis-job-actions .analysis-job-button { align-self: auto; margin-top: 0; }

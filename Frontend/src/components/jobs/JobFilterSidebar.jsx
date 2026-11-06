@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { jobFilterGroups } from "../../data/jobFilters.js";
-
-function JobFilterSidebar({ filters, onFilterChange, onReset }) {
+function JobFilterSidebar({ groups, singleKeys, filters, onFilterChange, onReset }) {
   const [isOpen, setIsOpen] = useState(false);
   const [skillQuery, setSkillQuery] = useState("");
   const [showAllSkills, setShowAllSkills] = useState(false);
@@ -21,7 +19,7 @@ function JobFilterSidebar({ filters, onFilterChange, onReset }) {
           <button type="button" onClick={reset}><span aria-hidden="true">⟳</span> 초기화</button>
         </div>
         <div className="jobs-filter-body">
-          {jobFilterGroups.map(({ key, label, options }) => {
+          {groups.map(({ key, label, options, emptyText }) => {
             const visibleOptions = key !== "skills" ? options : skillQuery.trim()
               ? options.filter((skill) => skill.toLowerCase().includes(skillQuery.trim().toLowerCase()))
               : showAllSkills ? options : options.slice(0, 6);
@@ -29,8 +27,9 @@ function JobFilterSidebar({ filters, onFilterChange, onReset }) {
               <fieldset className="jobs-filter-group" key={key}>
                 <legend>{label}</legend>
                 {key === "skills" && <label className="jobs-skill-search"><span aria-hidden="true">⌕</span><span className="sr-only">기술스택 검색</span><input type="search" placeholder="기술스택 검색" value={skillQuery} onChange={(event) => setSkillQuery(event.target.value)} /></label>}
-                {key !== "skills" && <label className="jobs-checkbox"><input type="checkbox" checked={filters[key].length === 0} onChange={() => onFilterChange(key, [])} /><span>전체</span></label>}
-                {visibleOptions.map((option) => <label className="jobs-checkbox" key={option}><input type="checkbox" checked={filters[key].includes(option)} onChange={() => onFilterChange(key, filters[key].includes(option) ? filters[key].filter((value) => value !== option) : [...filters[key], option])} /><span>{option}</span></label>)}
+                {key !== "skills" && <label className="jobs-checkbox"><input type={singleKeys.includes(key) ? "radio" : "checkbox"} name={`filter-${key}`} checked={filters[key].length === 0} onChange={() => onFilterChange(key, [])} /><span>전체</span></label>}
+                {visibleOptions.map((option) => <label className="jobs-checkbox" key={option}><input type={singleKeys.includes(key) ? "radio" : "checkbox"} name={`filter-${key}`} checked={filters[key].includes(option)} onChange={() => onFilterChange(key, singleKeys.includes(key) ? [option] : filters[key].includes(option) ? filters[key].filter((value) => value !== option) : [...filters[key], option])} /><span>{option}</span></label>)}
+                {key !== "skills" && emptyText && <p className="jobs-filter-no-options" role="status">{emptyText}</p>}
                 {key === "skills" && !visibleOptions.length && <p className="jobs-filter-no-options">일치하는 기술이 없습니다.</p>}
                 {key === "skills" && !skillQuery.trim() && <button className="jobs-filter-more" type="button" aria-expanded={showAllSkills} onClick={() => setShowAllSkills(!showAllSkills)}>{showAllSkills ? "접기" : "더보기"} <span aria-hidden="true">{showAllSkills ? "⌃" : "⌄"}</span></button>}
               </fieldset>

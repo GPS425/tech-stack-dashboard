@@ -5,8 +5,11 @@ export const jobFilterGroups = [
   { key: "skills", label: "기술스택", options: ["Java", "Spring", "React", "TypeScript", "JavaScript", "Python", "AWS", "Docker", "SQL", "Git", "Kubernetes", "Node.js"] },
   { key: "experiences", label: "경력", options: ["신입", "경력 1년 이상", "경력 3년 이상", "경력 5년 이상"] },
   { key: "employmentTypes", label: "고용 형태", options: ["정규직", "계약직", "인턴", "프리랜서"] },
-  { key: "regions", label: "근무 지역", options: ["서울", "경기", "인천", "부산", "대전", "원격"] },
+  { key: "regions", label: "근무 지역", options: ["서울", "경기", "인천", "부산", "대전"] },
 ];
+
+// API 가 값을 하나만 받는 필터 (경력·고용 형태·지역)
+export const singleSelectKeys = ["experiences", "employmentTypes", "regions"];
 
 export function createJobsState(query = "") {
   return {
