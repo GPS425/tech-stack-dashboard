@@ -2,6 +2,7 @@ package com.example.test.posting;
 
 import com.example.test.common.ApiException;
 import com.example.test.trend.TrendRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -107,8 +108,17 @@ public class PostingController {
 
         List<Integer> queryJobIds = allJobs ? List.of(-1) : jobIds;
         String employmentPattern = employment == null || employment.isBlank() ? "%" : "%" + escapeLike(employment.trim()) + "%";
-        String regionPattern = region == null || region.isBlank() ? "%" : escapeLike(region.trim()) + "%";
-        String qPattern = q == null || q.isBlank() ? "%" : "%" + escapeLike(q.trim().toLowerCase(Locale.ROOT)) + "%";
+        String regionPattern = region == null || region.isBlank() ? "%" : "%" + escapeLike(region.trim()) + "%";
+        List<String> qWords = q == null ? List.of()
+                : Arrays.stream(q.trim().toLowerCase(Locale.ROOT).split("\\s+"))
+                  .filter(w -> !w.isEmpty())
+                  .distinct()
+                  .limit(3)
+                  .toList();
+        String q1 = qWords.size() > 0 ? "%" + escapeLike(qWords.get(0)) + "%" : "%";
+        String q2 = qWords.size() > 1 ? "%" + escapeLike(qWords.get(1)) + "%" : "%";
+        String q3 = qWords.size() > 2 ? "%" + escapeLike(qWords.get(2)) + "%" : "%";
+
         List<String> aliases = skillNames.stream().map(m -> m.toLowerCase(Locale.ROOT)).distinct().toList();
         boolean newOnly = "NEW".equals(career);
 
@@ -138,7 +148,7 @@ public class PostingController {
         }
 
         Page<Posting> result = repository.search(allJobs, queryJobIds, employmentPattern, regionPattern
-                , skillCount, querySkillIds, newOnly, minExp, qPattern, deadlineSort, matchingSort, queryMySkillIds, today, pageable);
+                , skillCount, querySkillIds, newOnly, minExp, q1, q2, q3, deadlineSort, matchingSort, queryMySkillIds, today, pageable);
 
         List<Posting> postings = result.getContent();
         List<Long> ids = postings.stream()
@@ -223,7 +233,8 @@ public class PostingController {
     }
 
     @GetMapping("/api/postings/{postingId}")
-    public PostingDetail getPosting(@PathVariable long postingId){
+    public PostingDetail getPosting(@PathVariable long postingId,
+                                    @RequestParam(required = false) List<String> mySkills){
         Posting p = repository.findWithCompanyById(postingId)
                 .orElseThrow(() -> new ApiException(404, "POSTING_NOT_FOUND", "공고를 찾을 수 없습니다: " + postingId));
 
@@ -232,6 +243,23 @@ public class PostingController {
         Map<Long, List<String>> skillById = groupByPosting(tagRepository.findSkillNames(ids));
         List<String> jobs = jobsById.getOrDefault(p.getId(), List.of());
         List<String> skills = skillById.getOrDefault(p.getId(), List.of());
+
+        List<String> mySkillNames = mySkills == null ? List.of()
+                : mySkills.stream()
+                  .filter(m -> m != null && !m.isBlank())
+                  .map(m -> m.trim().toLowerCase(Locale.ROOT))
+                  .distinct()
+                  .toList();
+
+        Set<Integer> mySkillIds = mySkillNames.isEmpty() ? Set.of()
+                : trendRepository.findSkillsByAlias(mySkillNames).stream()
+                  .map(m -> m.skillId())
+                  .collect(Collectors.toSet());
+
+        Set<Integer> postingSkillIds = new HashSet<>();
+        for(PostingTagRepository.SkillIdTag t : tagRepository.findSkillIds(ids)){
+            postingSkillIds.add(t.skillId());
+        }
 
         return new PostingDetail(
                 p.getId(),
@@ -248,7 +276,8 @@ public class PostingController {
                 p.getDeadlineType(),
                 p.getUrl(),
                 p.getEducation(),
-                p.getClosed() != null && p.getClosed() == 1
+                p.getClosed() != null && p.getClosed() == 1,
+                calcMatchRate(!mySkillNames.isEmpty(), mySkillIds, postingSkillIds)
         );
     }
 }

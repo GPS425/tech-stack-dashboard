@@ -16,5 +16,6 @@ public record PostingDetail(long postingId,
                             String deadlineType,
                             String url,
                             String education,
-                            boolean closed) {
+                            boolean closed,
+                            Double matchRate) {
 }

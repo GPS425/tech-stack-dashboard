@@ -26,13 +26,19 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
             + "and (:skillCount = 0 or (select count(distinct k) from p.skillIds k where k in :skillIds) = :skillCount) "
             + "and (:newOnly = false or p.careerType in ('NEW', 'NEW_OR_EXP', 'ANY')) "
             + "and (:minExp = 0 or (p.careerType = 'EXPERIENCED' and p.expMin >= :minExp)) "
-            + "and (:q = '%' or lower(p.title) like :q escape '!' or lower(p.company.name) like :q escape '!' "
-            + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q escape '!' "
+            + "and (:q1 = '%' or lower(p.title) like :q1 escape '!' or lower(p.company.name) like :q1 escape '!' "
+            + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q1 escape '!' "
+            + "                and s.id member of p.skillIds)) "
+            + "and (:q2 = '%' or lower(p.title) like :q2 escape '!' or lower(p.company.name) like :q2 escape '!' "
+            + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q2 escape '!' "
+            + "                and s.id member of p.skillIds)) "
+            + "and (:q3 = '%' or lower(p.title) like :q3 escape '!' or lower(p.company.name) like :q3 escape '!' "
+            + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q3 escape '!' "
             + "                and s.id member of p.skillIds)) "
             + "order by case when :matchingSort = false then 0.0 "
-            + "              when (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds) = 0 then 0.0 "
-            + "              else (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds and s.id in :mySkillIds) * 1.0 "
-            + "                   / (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds) end desc, "
+            + "              when (select count(distinct k) from p.skillIds k where exists (select 1 from Skill s where s.id = k and s.active = 1)) = 0 then 0.0 "
+            + "              else (select count(distinct k) from p.skillIds k where k in :mySkillIds and exists (select 1 from Skill s where s.id = k and s.active = 1)) * 1.0 "
+            + "                   / (select count(distinct k) from p.skillIds k where exists (select 1 from Skill s where s.id = k and s.active = 1)) end desc, "
             + "         case when :deadlineSort = false then 0 "
             + "              when p.deadlineOn is null then 1 "
             + "              when p.deadlineOn < :today then 2 "
@@ -46,9 +52,15 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
                     + "and (:skillCount = 0 or (select count(distinct k) from p.skillIds k where k in :skillIds) = :skillCount) "
                     + "and (:newOnly = false or p.careerType in ('NEW', 'NEW_OR_EXP', 'ANY')) "
                     + "and (:minExp = 0 or (p.careerType = 'EXPERIENCED' and p.expMin >= :minExp)) "
-                    + "and (:q = '%' or lower(p.title) like :q escape '!' or lower(p.company.name) like :q escape '!' "
-                    + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q escape '!' "
-                    + "                and s.id member of p.skillIds))")
+                    + "and (:q1 = '%' or lower(p.title) like :q1 escape '!' or lower(p.company.name) like :q1 escape '!' "
+                    + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q1 escape '!' "
+                    + "                and s.id member of p.skillIds)) "
+                    + "and (:q2 = '%' or lower(p.title) like :q2 escape '!' or lower(p.company.name) like :q2 escape '!' "
+                    + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q2 escape '!' "
+                    + "                and s.id member of p.skillIds)) "
+                    + "and (:q3 = '%' or lower(p.title) like :q3 escape '!' or lower(p.company.name) like :q3 escape '!' "
+                    + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q3 escape '!' "
+                    + "                and s.id member of p.skillIds)) ")
     Page<Posting> search(@Param("allJobs") boolean allJobs,
                          @Param("jobIds") List<Integer> jobIds,
                          @Param("employment") String employment,
@@ -57,7 +69,9 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
                          @Param("skillIds") List<Integer> skillIds,
                          @Param("newOnly") boolean newOnly,
                          @Param("minExp") int minExp,
-                         @Param("q") String q,
+                         @Param("q1") String q1,
+                         @Param("q2") String q2,
+                         @Param("q3") String q3,
                          @Param("deadlineSort") boolean deadlineSort,
                          @Param("matchingSort") boolean matchingSort,
                          @Param("mySkillIds") List<Integer> mySkillIds,

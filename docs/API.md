@@ -23,7 +23,7 @@
 | 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 ✅ 구현 |
 | 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 ✅ 구현 |
 | 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) ✅ 구현 (`sort=matching`·`mySkills`·`matchRate` 포함) |
-| 6 | GET | /api/postings/{postingId} | 공고 상세 ✅ 구현 |
+| 6 | GET | /api/postings/{postingId} | 공고 상세 ✅ 구현 (`mySkills`·`matchRate` 포함) |
 
 ## 공통 규칙
 
@@ -198,12 +198,12 @@
 ### GET /api/postings
 | 파라미터 | 예 | 뜻 |
 |---|---|---|
-| `q` | `spring` | 제목·회사·기술 이름 검색 (대소문자 구분 없음, 부분 일치) |
+| `q` | `백엔드 spring` | 제목·회사·기술 이름 검색 (대소문자 구분 없음, 부분 일치). 띄어쓰기로 단어를 나눠 **모든 단어**가 제목·회사·기술 중 어딘가에 있어야 함(AND). 단어는 앞의 3개까지만 사용 |
 | `jobIds` | `1,23` | 직무 번호, 쉼표로 최대 50개 (하나라도 걸린 공고). 없는 직무가 하나라도 있으면 404 `JOB_NOT_FOUND` |
 | `skills` | `Java,Docker` | 기술, 쉼표로 최대 50개 (모두 가진 공고). 별칭도 됩니다(`스프링` = Spring). 빈 원소(`Java,` 의 끝)는 무시. 모르는 기술이 하나라도 있으면 빈 결과(`total` 0) |
 | `career` | `NEW` | `NEW`(신입 가능: 신입·신입/경력·경력무관) · `EXP1` · `EXP3` · `EXP5`(최소 경력 N년 이상 요구) |
 | `employment` | `정규직` | 고용 형태 (포함 검색: `정규직` 은 "정규직, 계약직" 도 찾음) |
-| `region` | `서울` | 시·도 (`region` 칸이 이 글자로 시작하는 공고) |
+| `region` | `서울` | 시·도 (`region` 칸에 이 글자가 포함된 공고. 여러 지역이 적힌 공고도 포함) |
 | `sort` | `latest` | `latest`(등록 최신순, 기본) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치율 높은 순, 같으면 최신순. `mySkills` 필요. 없으면 400 `MY_SKILLS_REQUIRED`) |
 | `mySkills` | `Java,Spring` | 일치율 계산용. 기술 이름을 쉼표로 여러 개(최대 50개). 별칭(`skill_alias`)도 인정하고, 모르는 이름은 무시합니다 |
 | `page` · `size` | `1` · `10` | 쪽 (`page` 는 1~100000, `size` 는 1~50) |
@@ -228,6 +228,7 @@
 }
 ```
 - 진행 중 공고만. 통계 제외 공고도 목록에는 나옵니다(통계에서만 뺌)
+- `postedOn` 은 등록일이 아니라 **접수 시작일**입니다(사람인 상세의 접수 기간 시작). 미리 올려 둔 공고는 오늘보다 미래 날짜일 수 있고, 화면은 이를 "접수 예정"으로 표시합니다. 진짜 등록일은 수집하지 않습니다
 - `matchRate`: `mySkills` 를 줬을 때만, 공고의 활성 기술 중 내가 가진 비율(0~100, 소수 첫째 자리 반올림). 공고에 기술이 없으면 `0.0`, `mySkills` 를 안 주면(빈 값·공백뿐인 것도 안 준 것으로 봅니다) `null`
 - 조건을 여러 개 주면 모두 만족하는 공고만 나옵니다(AND). 아무것도 안 주면 진행 중 공고 전체
 - 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다. `deadline` 정렬에서 마감일이 같으면 `latest` 와 같은 순서(등록 최신순 → `postingId` 큰 순)
@@ -237,7 +238,7 @@
 - 쓰는 화면: 공고 목록, 역량 분석의 추천 공고
 
 ### GET /api/postings/{postingId}
-목록의 한 줄과 같은 모양에 `education`(학력) 과 `closed`(마감 여부) 를 더합니다(`matchRate` 는 없음). 없는 번호는 404 `POSTING_NOT_FOUND`. 마감된 공고도 조회되며 `closed: true` 로 알려 줍니다.
+목록의 한 줄과 같은 모양에 `education`(학력) 과 `closed`(마감 여부) 를 더합니다. 없는 번호는 404 `POSTING_NOT_FOUND`. 마감된 공고도 조회되며 `closed: true` 로 알려 줍니다.
 
 ```json
 {
@@ -247,9 +248,13 @@
   "skills": ["AWS", "Azure", "GCP", "Jira"],
   "postedOn": "2026-11-04", "deadlineOn": "2026-12-03", "deadlineType": "DATE",
   "url": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55473223",
-  "education": "대졸(4년제) 이상", "closed": false
+  "education": "대졸(4년제) 이상", "closed": false,
+  "matchRate": null
 }
 ```
+
+쿼리 파라미터(선택)
+- `mySkills` (여러 번 가능): 내가 가진 기술. 주면 목록과 같은 계산으로 `matchRate`(0~100) 를 돌려주고, 안 주면 `null`. 예: `/api/postings/55473308?mySkills=Java&mySkills=Spring` → 기술 8개 중 2개 일치 → `25.0`
 
 ---
 
