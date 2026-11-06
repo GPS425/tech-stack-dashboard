@@ -204,7 +204,7 @@
 | `career` | `NEW` | `NEW`(신입 가능: 신입·신입/경력·경력무관) · `EXP1` · `EXP3` · `EXP5`(최소 경력 N년 이상 요구) |
 | `employment` | `정규직` | 고용 형태 (포함 검색: `정규직` 은 "정규직, 계약직" 도 찾음) |
 | `region` | `서울` | 시·도 (`region` 칸에 이 글자가 포함된 공고. 여러 지역이 적힌 공고도 포함) |
-| `sort` | `latest` | `latest`(등록 최신순, 기본) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치율 높은 순, 같으면 최신순. `mySkills` 필요. 없으면 400 `MY_SKILLS_REQUIRED`) |
+| `sort` | `latest` | `latest`(접수 시작일 최신순, 기본. 시작일이 미래인 "접수 예정" 공고는 맨 뒤로 가고, 접수가 시작된 공고가 먼저 옵니다) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치율 높은 순, 같으면 최신순. `mySkills` 필요. 없으면 400 `MY_SKILLS_REQUIRED`) |
 | `mySkills` | `Java,Spring` | 일치율 계산용. 기술 이름을 쉼표로 여러 개(최대 50개). 별칭(`skill_alias`)도 인정하고, 모르는 이름은 무시합니다 |
 | `page` · `size` | `1` · `10` | 쪽 (`page` 는 1~100000, `size` 는 1~50) |
 
@@ -222,7 +222,7 @@
       "skills": ["Java", "Spring Boot", "MySQL"],
       "postedOn": "2026-10-20", "deadlineOn": "2026-11-10", "deadlineType": "DATE",
       "url": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55012345",
-      "matchRate": 100.0
+      "matchRate": null
     }
   ]
 }
@@ -231,10 +231,11 @@
 - `postedOn` 은 등록일이 아니라 **접수 시작일**입니다(사람인 상세의 접수 기간 시작). 미리 올려 둔 공고는 오늘보다 미래 날짜일 수 있고, 화면은 이를 "접수 예정"으로 표시합니다. 진짜 등록일은 수집하지 않습니다
 - `matchRate`: `mySkills` 를 줬을 때만, 공고의 활성 기술 중 내가 가진 비율(0~100, 소수 첫째 자리 반올림). 공고에 기술이 없으면 `0.0`, `mySkills` 를 안 주면(빈 값·공백뿐인 것도 안 준 것으로 봅니다) `null`
 - 조건을 여러 개 주면 모두 만족하는 공고만 나옵니다(AND). 아무것도 안 주면 진행 중 공고 전체
-- 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다. `deadline` 정렬에서 마감일이 같으면 `latest` 와 같은 순서(등록 최신순 → `postingId` 큰 순)
+- 같은 날짜끼리는 `postingId` 가 큰 공고가 먼저 나옵니다. `deadline` 정렬에서 마감일이 같으면 `latest` 와 같은 순서(접수 시작일 최신순 → `postingId` 큰 순)
 - `deadline` 정렬의 "오늘" 은 한국 날짜이고, 오늘 마감인 공고는 앞쪽(마감일 있음)에 들어갑니다. 마감일이 지났는데 아직 닫히지 않은 공고(크롤러가 닫기 전)는 맨 뒤
 - `career` 문구: `NEW` "신입" · `ANY` "경력무관" · `NEW_OR_EXP` "신입, 경력" · 경력 유형이 없으면 "미정". `EXPERIENCED` 는 최소·최대 경력으로: 둘 다 없거나 최소 0·최대 없음 "경력", 최소만 "경력 N년 이상", 최대만 "경력 N년 이하", 같으면 "경력 N년", 다르면 "경력 a~b년"
 - 마감 종류 `deadlineType`: DATE(날짜) · UNTIL_FILLED(채용시) · ALWAYS(상시) · ROLLING(수시)
+- `deadlineOn` 은 `deadlineType` 이 `DATE` 일 때만 믿으세요. 그 외에는 `null` 이고, 옛 수집분에는 `9999-01-01` 이 들어 있는 공고도 있습니다. 화면은 `deadlineType` 으로 판단합니다
 - 쓰는 화면: 공고 목록, 역량 분석의 추천 공고
 
 ### GET /api/postings/{postingId}

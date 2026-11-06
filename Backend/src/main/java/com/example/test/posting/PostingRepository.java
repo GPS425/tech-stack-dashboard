@@ -44,6 +44,7 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
             + "              when p.deadlineOn < :today then 2 "
             + "              else 0 end, "
             + "         case when :deadlineSort = true then p.deadlineOn end, "
+            + "         case when p.postedOn > :today then 1 else 0 end, "
             + "         p.postedOn desc nulls last, p.id desc",
             countQuery = "select count(p) from Posting p where p.closed = 0 "
                     + "and (:allJobs = true or exists (select 1 from p.jobIds j where j in :jobIds)) "
