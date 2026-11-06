@@ -35,6 +35,7 @@ public class PostingController {
                                            @RequestParam(required = false) String q,
                                            @RequestParam(required = false) List<String> skills,
                                            @RequestParam(required = false) String career,
+                                           @RequestParam(required = false) List<String> mySkills,
                                            @RequestParam(defaultValue = "latest") String sort,
                                            @RequestParam(defaultValue = "1") int page,
                                            @RequestParam(defaultValue = "10") int size){
@@ -52,13 +53,36 @@ public class PostingController {
             throw new ApiException(400, "INVALID_CAREER", "career는 NEW, EXP1, EXP3, EXP5 중 하나여야 합니다: " + career);
         }
 
-        if(!"latest".equals(sort) && !"deadline".equals(sort)){
-            throw new ApiException(400, "INVALID_SORT", "sort는 latest, deadline 중 하나여야 합니다: " + sort);
+        if (!List.of("latest", "deadline", "matching").contains(sort)){
+            throw new ApiException(400, "INVALID_SORT",
+                    "sort는 latest, deadline, matching 중 하나여야 합니다: " + sort);
         }
 
-        // "Java," 처럼 끝에 쉼표가 있으면 빈 원소가 생긴다. 빼고 센다
+        List<String> mySkillNames = mySkills == null ? List.of()
+                : mySkills.stream()
+                  .filter(m -> m!= null && !m.isBlank())
+                  .map(m -> m.trim().toLowerCase(Locale.ROOT))
+                  .distinct()
+                  .toList();
+
+        if(mySkillNames.size() > 50){
+            throw new ApiException(400, "INVALID_PARAMETER", "mySkills는 최대 50개입니다: " + mySkillNames.size());
+        }
+
+        if ("matching".equals(sort) && mySkillNames.isEmpty()) {
+            throw new ApiException(400, "MY_SKILLS_REQUIRED", "sort=matching에는 mySkills가 필요합니다.");
+        }
+
+        Set<Integer> mySkillIds = mySkillNames.isEmpty() ? Set.of()
+                : trendRepository.findSkillsByAlias(mySkillNames).stream()
+                  .map(m -> m.skillId())
+                  .collect(Collectors.toSet());
+
         List<String> skillNames = skills == null ? List.of()
-                : skills.stream().filter(m -> m != null && !m.isBlank()).map(m -> m.trim()).toList();
+                : skills.stream()
+                  .filter(m -> m != null && !m.isBlank())
+                  .map(m -> m.trim())
+                  .toList();
 
         if(jobIds != null && jobIds.size() > 50){
             throw new ApiException(400, "INVALID_PARAMETER", "jobIds는 최대 50개입니다: " + jobIds.size());
@@ -77,6 +101,8 @@ public class PostingController {
         // 정렬은 쿼리의 ORDER BY 가 한다(PostingRepository.search 주석)
         Pageable pageable = PageRequest.of(page - 1, size);
         boolean deadlineSort = "deadline".equals(sort);
+        boolean matchingSort = "matching".equals(sort);
+        List<Integer> queryMySkillIds = mySkillIds.isEmpty() ? List.of(-1) : List.copyOf(mySkillIds);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         List<Integer> queryJobIds = allJobs ? List.of(-1) : jobIds;
@@ -112,7 +138,7 @@ public class PostingController {
         }
 
         Page<Posting> result = repository.search(allJobs, queryJobIds, employmentPattern, regionPattern
-                , skillCount, querySkillIds, newOnly, minExp, qPattern, deadlineSort, today, pageable);
+                , skillCount, querySkillIds, newOnly, minExp, qPattern, deadlineSort, matchingSort, queryMySkillIds, today, pageable);
 
         List<Posting> postings = result.getContent();
         List<Long> ids = postings.stream()
@@ -121,11 +147,16 @@ public class PostingController {
 
         Map<Long, List<String>> jobsById = groupByPosting(tagRepository.findJobNames(ids));
         Map<Long, List<String>> skillsById = groupByPosting(tagRepository.findSkillNames(ids));
+        Map<Long, Set<Integer>> skillIdsById = new HashMap<>();
+        for(PostingTagRepository.SkillIdTag t : tagRepository.findSkillIds(ids)){
+            skillIdsById.computeIfAbsent(t.postingId(), k -> new HashSet<>()).add(t.skillId());
+        }
 
         List<PostingItem> items = postings.stream()
                 .map(p -> toItem(p,
                         jobsById.getOrDefault(p.getId(), List.of()),
-                        skillsById.getOrDefault(p.getId(), List.of())))
+                        skillsById.getOrDefault(p.getId(), List.of()),
+                        calcMatchRate(!mySkillNames.isEmpty(), mySkillIds, skillIdsById.getOrDefault(p.getId(), Set.of()))))
                 .toList();
 
         return new PostingListResponse(page, size, result.getTotalElements(), items);
@@ -161,7 +192,7 @@ public class PostingController {
         else return "미정";
     }
 
-    private PostingItem toItem(Posting p, List<String> jobs, List<String> skills){
+    private PostingItem toItem(Posting p, List<String> jobs, List<String> skills, Double matchRate){
         return new PostingItem(
                 p.getId(),
                 p.getCompany().getName(),
@@ -176,8 +207,19 @@ public class PostingController {
                 p.getDeadlineOn() == null ? null : p.getDeadlineOn().toString(),
                 p.getDeadlineType(),
                 p.getUrl(),
-                null
+                matchRate
         );
+    }
+
+    private Double calcMatchRate(boolean given, Set<Integer> mySkillIds, Set<Integer> postingSkillIds){
+        if (!given) {
+            return null;
+        }
+        if(postingSkillIds.isEmpty()){
+            return 0.0;
+        }
+        long matched = postingSkillIds.stream().filter(mySkillIds::contains).count();
+        return Math.round(matched * 1000.0 / postingSkillIds.size()) / 10.0;
     }
 
     @GetMapping("/api/postings/{postingId}")

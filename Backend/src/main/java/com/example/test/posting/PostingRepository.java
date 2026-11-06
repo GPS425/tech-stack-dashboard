@@ -17,6 +17,7 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
     // 정렬은 Pageable 의 Sort 가 아니라 이 ORDER BY 로 한다(deadline 의 "지난 마감일은 맨 뒤"를 Sort 로 못 나타냄)
     //   latest  : postedOn 최신순(없으면 뒤), 같으면 postingId 큰 순
     //   deadline: 마감일 있음(오늘 포함, 가까운 순) → 마감일 없음 → 마감일 지남, 그 안에서는 latest 와 같은 동률 규칙
+    //   matching: 일치율(내 기술 ∩ 공고 활성 기술 ÷ 공고 활성 기술) 높은 순, 같으면 latest 와 같은 동률 규칙
     @EntityGraph(attributePaths = "company")
     @Query(value = "select p from Posting p where p.closed = 0 "
             + "and (:allJobs = true or exists (select 1 from p.jobIds j where j in :jobIds)) "
@@ -28,7 +29,11 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
             + "and (:q = '%' or lower(p.title) like :q escape '!' or lower(p.company.name) like :q escape '!' "
             + "     or exists (select 1 from Skill s where s.active = 1 and lower(s.name) like :q escape '!' "
             + "                and s.id member of p.skillIds)) "
-            + "order by case when :deadlineSort = false then 0 "
+            + "order by case when :matchingSort = false then 0.0 "
+            + "              when (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds) = 0 then 0.0 "
+            + "              else (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds and s.id in :mySkillIds) * 1.0 "
+            + "                   / (select count(s) from Skill s where s.active = 1 and s.id member of p.skillIds) end desc, "
+            + "         case when :deadlineSort = false then 0 "
             + "              when p.deadlineOn is null then 1 "
             + "              when p.deadlineOn < :today then 2 "
             + "              else 0 end, "
@@ -54,6 +59,8 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
                          @Param("minExp") int minExp,
                          @Param("q") String q,
                          @Param("deadlineSort") boolean deadlineSort,
+                         @Param("matchingSort") boolean matchingSort,
+                         @Param("mySkillIds") List<Integer> mySkillIds,
                          @Param("today") LocalDate today,
                          Pageable pageable);
 

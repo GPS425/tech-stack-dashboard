@@ -14,6 +14,9 @@ public class PostingTagRepository {
     public record Tag(long postingId, String name){
     }
 
+    public record SkillIdTag(long postingId, int skillId){
+    }
+
     public PostingTagRepository(JdbcTemplate jdbcTemplate){
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -47,6 +50,21 @@ public class PostingTagRepository {
 
         return jdbcTemplate.query(sql,
                 (rs, rowNum) -> new Tag(rs.getLong("posting_id"), rs.getString("name")),
+                postingIds.toArray());
+    }
+
+    public List<SkillIdTag> findSkillIds(List<Long> postingIds){
+        if(postingIds.isEmpty()){
+            return List.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(postingIds.size(), "?"));
+        String sql = "SELECT DISTINCT ps.posting_id, ps.skill_id "
+                + "FROM posting_skill ps "
+                + "JOIN skill k ON k.skill_id = ps.skill_id AND k.is_active = 1 "
+                + "WHERE ps.posting_id IN (" + placeholders + ")";
+
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> new SkillIdTag(rs.getLong("posting_id"), rs.getInt("skill_id")),
                 postingIds.toArray());
     }
 
