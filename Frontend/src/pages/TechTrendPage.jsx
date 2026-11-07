@@ -206,7 +206,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
 
         <section className="trend-related-section" aria-labelledby="trend-related-title">
           <div className="content-container">
-            <TrendHeading id="trend-related-title" icon="briefcase" title="관련 채용 공고" description="선택한 직무의 주요 기술스택과 관련된 최신 채용 공고를 확인해보세요.">
+            <TrendHeading id="trend-related-title" icon="briefcase" title="관련 채용 공고" description="선택한 직무의 주요 기술스택과 관련된 채용 공고를 마감이 임박한 순서로 확인해보세요.">
               <button className="trend-all-jobs" type="button" onClick={onBrowseJobs}>전체 채용공고 보기 <span aria-hidden="true">→</span></button>
             </TrendHeading>
             <p className="sr-only" role="status" aria-live="polite">{selectedJob === "all" ? "전체 직무" : trend.selectedJob.label} 기준 기술 조합과 관련 공고, {rankingJob ? rankingJob.name : ""} 인기 기술을 표시합니다.</p>

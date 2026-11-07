@@ -36,6 +36,13 @@ function JobDetailPage({ jobId, profile, onBrowseJobs, onEditSkills, onViewAnaly
   const dDay = job ? dDayLabel(job) : null;
   const { have, lack } = job ? splitSkills(job.skills, profile.skills) : { have: [], lack: [] };
   const hasProfile = profile.skills.length > 0;
+  // 필수·우대 구분이 있는 공고는 세 묶음(필수/우대/기타)으로 보여 주고, 내가 못 가진 기술은 주황색으로 표시한다
+  const ownedSkills = new Set(profile.skills.map((skill) => skill.trim().toLowerCase()));
+  const skillChip = (skill) => <span key={skill} className={hasProfile && !ownedSkills.has(skill.trim().toLowerCase()) ? "is-lack" : undefined}>{skill}</span>;
+  const requiredSkills = job?.requiredSkills || [];
+  const preferredSkills = job?.preferredSkills || [];
+  const grouped = requiredSkills.length > 0 || preferredSkills.length > 0;
+  const otherSkills = grouped ? job.skills.filter((skill) => !requiredSkills.includes(skill) && !preferredSkills.includes(skill)) : [];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -76,7 +83,7 @@ function JobDetailPage({ jobId, profile, onBrowseJobs, onEditSkills, onViewAnaly
           </dl>
           <section className="jobs-detail-section">
             <h2>요구 기술 <span className="jobs-detail-count">{job.skills.length}개</span></h2>
-            {!job.skills.length ? <p>수집된 요구 기술이 없습니다.</p> : hasProfile ? <div className="jobs-skill-compare">
+            {!job.skills.length ? <p>수집된 요구 기술이 없습니다.</p> : grouped ? <div className="jobs-skill-groups">{requiredSkills.length > 0 && <div><h3>필수 <strong>{requiredSkills.length}</strong></h3><div className="jobs-skill-tags">{requiredSkills.map(skillChip)}</div></div>}{preferredSkills.length > 0 && <div><h3>우대 <strong>{preferredSkills.length}</strong></h3><div className="jobs-skill-tags">{preferredSkills.map(skillChip)}</div></div>}{otherSkills.length > 0 && <div><h3>기타 <strong>{otherSkills.length}</strong></h3><div className="jobs-skill-tags">{otherSkills.map(skillChip)}</div></div>}{hasProfile && <p>내가 가진 기술 {have.length}개 / 전체 {job.skills.length}개 · 주황색은 아직 갖추지 못한 기술입니다.</p>}</div> : hasProfile ? <div className="jobs-skill-compare">
               <div><h3>내가 가진 기술 <strong>{have.length}</strong></h3>{have.length ? <div className="jobs-skill-tags jobs-skill-tags--have">{have.map((skill) => <span key={skill}>{skill}</span>)}</div> : <p>겹치는 기술이 없습니다.</p>}</div>
               <div><h3>부족한 기술 <strong>{lack.length}</strong></h3>{lack.length ? <div className="jobs-skill-tags jobs-skill-tags--lack">{lack.map((skill) => <span key={skill}>{skill}</span>)}</div> : <p>요구 기술을 모두 갖추고 있어요!</p>}</div>
             </div> : <div className="jobs-skill-tags">{job.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>}

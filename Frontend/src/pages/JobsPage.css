@@ -215,5 +215,10 @@
 .jobs-skill-compare h3 strong { color: #008261; }
 .jobs-skill-compare p { color: var(--jobs-muted); font-size: 12px; line-height: 1.7; }
 .jobs-skill-tags--lack > span { background: #fff1ec; color: #c2410c; }
+.jobs-skill-tags > span.is-lack { background: #fff1ec; color: #c2410c; }
+.jobs-skill-groups { display: grid; gap: 16px; }
+.jobs-skill-groups h3 { margin: 0 0 8px; font-size: 13px; }
+.jobs-skill-groups h3 strong { color: #008261; }
+.jobs-skill-groups p { color: var(--jobs-muted); font-size: 12px; line-height: 1.7; }
 .jobs-detail-notice { margin-top: 24px; padding: 12px 14px; border-radius: 6px; background: #f6fbf8; color: var(--jobs-muted); font-size: 11px; line-height: 1.7; }
 @media (max-width: 640px) { .jobs-skill-compare { grid-template-columns: minmax(0, 1fr); } }

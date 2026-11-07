@@ -31,6 +31,8 @@ export function toJob(item) {
     experience: item.career,
     employmentType: item.employmentType || "미정",
     skills: item.skills || [],
+    requiredSkills: item.requiredSkills || [],
+    preferredSkills: item.preferredSkills || [],
     postedAt: item.postedOn || "",
     // 채용시·상시·수시 공고는 서버가 마감일을 9999-01-01 로 보내므로 날짜 마감일 때만 씁니다
     deadline: item.deadlineType === "DATE" ? item.deadlineOn || null : null,

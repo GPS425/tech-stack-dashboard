@@ -108,7 +108,7 @@ function JobsPage({ profile, state, onStateChange, onViewJob, onBrowseJobs, onEd
             </div>
             <div className="jobs-toolbar">
               <h2 id="jobs-results-title" aria-live="polite" aria-atomic="true">검색 결과 <strong>{result.data ? total.toLocaleString("ko-KR") : "-"}</strong>건</h2>
-              <label><span className="sr-only">공고 정렬</span><select value={!hasProfile && state.sort === "matching" ? "latest" : state.sort} onChange={(event) => updateCriteria({ sort: event.target.value })}><option value="latest">최신 등록순</option><option value="deadline">마감 임박순</option><option value="matching" disabled={!hasProfile}>내 역량 매칭순{!hasProfile ? " (역량 입력 필요)" : ""}</option></select></label>
+              <label><span className="sr-only">공고 정렬</span><select value={!hasProfile && state.sort === "matching" ? "latest" : state.sort} onChange={(event) => updateCriteria({ sort: event.target.value })}><option value="latest">접수 시작 최신순</option><option value="deadline">마감 임박순</option><option value="matching" disabled={!hasProfile}>내 역량 매칭순{!hasProfile ? " (역량 입력 필요)" : ""}</option></select></label>
             </div>
             <div className="jobs-recommendation">
               <AnalysisIcon name="bulb" />
