@@ -6,6 +6,7 @@ Oracle 21c XE (XEPDB1) 의 팀 스키마 `capstone`.
 |---|---|
 | `01-schema.sql` | 테이블·제약. 9/28 설계 초안 + 2차에서 `posting.is_excluded` 추가 |
 | `02-review-fix.sql` | 10/1 크롤링 검수: `skill.is_active`, `posting_job.last_seen_at`, `posting.raw_deleted_at`, `crawl_run.heartbeat_at`, RUNNING 한 건만(`uk_run_running`). 새 크롤러보다 먼저 적용 |
+| `04-primary-job.sql` | 11/7 대표 직무: `posting_job.is_primary`(0/1, 공고마다 하나가 1). 칸 추가만. 새 크롤러보다 먼저 적용 |
 | `03-dev-data.sql` | **개발용 데이터**. 기준 데이터와 집계 통계는 실제 값, 공고·회사는 지어낸 견본. 빈 DB 에만 넣음 |
 | `api-표시규칙.sql` | API 가 쓸 조회와 화면 규칙: '이 직무만' 순위, 공고가 적은 직무 표시 |
 

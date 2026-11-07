@@ -41,7 +41,7 @@ import com.capstone.jobtrend.crawler.ListPageParser.ListPage;
 import com.capstone.jobtrend.crawler.SaraminClient.BlockedException;
 
 /**
- * 하루 한 번의 수집: ① 목록 → ② 마감 처리 → ③ 상세 → ④ 기술 추출 → ⑤ 집계(StatService).
+ * 하루 한 번의 수집: ① 목록 → ② 마감 처리 → ③ 상세 → ④ 기술 추출 → ④-2 대표 직무(PrimaryJob) → ⑤ 집계(StatService).
  * 사람인에 요청하는 곳은 ①과 ③뿐이고 SaraminClient 를 지난다. 공고 하나가 끝날 때마다 바로 저장한다.
  * 쿼리는 설계 문서(캡스톤_DB_설계.html)의 단계별 쿼리를 그대로 옮겼다.
  */
@@ -254,7 +254,8 @@ public class CrawlService {
                 fetchDetails(c, runId, note);
                 saveCounts(runId, c, "③ 상세 끝" + (note == null ? "" : " · " + note));
             }
-            extractSkills(c);
+            Map<Long, List<Integer>> tagCodes = extractSkills(c);
+            markPrimaryJobs(tagCodes);
             stats.calculate(LocalDate.now(SEOUL));
             status = "DONE";
         } catch (StopRun e) {
@@ -847,7 +848,9 @@ public class CrawlService {
 
     // ---------- ④ 기술 추출 ----------
 
-    void extractSkills(Counts c) {
+    /** 돌려주는 것: 원본을 읽은 공고의 상세 태그 코드(나온 순서). 대표 직무 단계가 쓴다 */
+    Map<Long, List<Integer>> extractSkills(Counts c) {
+        Map<Long, List<Integer>> tagCodes = new HashMap<>();
         List<SkillMatcher.Alias> aliases = new ArrayList<>();
         Map<String, Integer> byName = new HashMap<>();          // 태그 이름 → 기술 (글에서 안 찾는 별칭도)
         db.query("SELECT alias, skill_id, text_match FROM skill_alias", rs -> {
@@ -896,6 +899,7 @@ public class CrawlService {
             Set<Integer> tag = new LinkedHashSet<>();
             Set<Integer> codes = new HashSet<>();
             raw.get().tags().forEach(t -> codes.add(t.code()));
+            tagCodes.put(id, raw.get().tags().stream().map(Tag::code).toList());
             for (Tag t : raw.get().tags()) {
                 // AIX(193) 태그는 대부분 'AI(인공지능)'과 같이 붙은 오탐이다(9/29 검수: 33건 중 27건). 유닉스 계열 태그가 같이 있을 때만 인정
                 if (t.code() == AIX_CODE && codes.stream().noneMatch(UNIX_CODES::contains)) continue;
@@ -932,6 +936,65 @@ public class CrawlService {
                     .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                     .limit(40).map(e -> e.getKey() + "(" + e.getValue() + ")").reduce((a, b) -> a + ", " + b).orElse("");
             log.info("④ 기술로 못 맞춘 태그 {}종 (많은 순): {}", unmatchedTags.size(), top);
+        }
+        return tagCodes;
+    }
+
+    // ---------- ④-2 대표 직무 ----------
+
+    /** posting_job.is_primary 가 있는지(db/04-primary-job.sql). 없으면 대표 직무 단계를 건너뛴다 */
+    private boolean hasPrimaryColumn() {
+        Integer n = db.queryForObject("""
+                SELECT COUNT(*) FROM user_tab_columns WHERE table_name = 'POSTING_JOB' AND column_name = 'IS_PRIMARY'
+                """, new MapSqlParameterSource(), Integer.class);
+        return n != null && n > 0;
+    }
+
+    /**
+     * 진행 중 공고마다 대표 직무 하나를 posting_job.is_primary = 1 로 적는다(PrimaryJob). 연결 자체는 바꾸지 않는다.
+     * 바뀐 공고만 쓴다. 통계(⑤)는 대표 직무를 보지 않는다.
+     * 실패해도 회차는 멈추지 않는다(화면은 1 이 없으면 지금처럼 직무 순서로 보여 준다).
+     */
+    void markPrimaryJobs(Map<Long, List<Integer>> tagCodes) {
+        try {
+            if (!hasPrimaryColumn()) {
+                log.warn("④-2 posting_job.is_primary 칸이 없어 대표 직무를 건너뜀 (db/04-primary-job.sql 적용 필요)");
+                return;
+            }
+            record Link(int jobId, int code, boolean primary) {}
+            Map<Long, String> titles = new HashMap<>();
+            Map<Long, List<Link>> links = new java.util.LinkedHashMap<>();
+            db.query("""
+                    SELECT pj.posting_id, p.title, pj.job_id, j.saramin_code, pj.is_primary
+                      FROM posting_job pj JOIN posting p ON p.posting_id = pj.posting_id JOIN job j ON j.job_id = pj.job_id
+                     WHERE p.is_closed = 0
+                     ORDER BY pj.posting_id, j.sort_order, j.job_id
+                    """, rs -> {
+                long id = rs.getLong(1);
+                titles.put(id, rs.getString(2));
+                links.computeIfAbsent(id, k -> new ArrayList<>()).add(new Link(rs.getInt(3), rs.getInt(4), rs.getInt(5) == 1));
+            });
+            List<MapSqlParameterSource> rows = new ArrayList<>();
+            Map<PrimaryJob.Reason, Integer> reasons = new java.util.EnumMap<>(PrimaryJob.Reason.class);
+            for (Map.Entry<Long, List<Link>> e : links.entrySet()) {
+                List<Link> ls = e.getValue();
+                PrimaryJob.Pick pick = PrimaryJob.pick(titles.get(e.getKey()), tagCodes.getOrDefault(e.getKey(), List.of()),
+                        ls.stream().map(Link::code).toList());
+                reasons.merge(pick.reason(), 1, Integer::sum);
+                boolean same = ls.stream().allMatch(l -> l.primary() == (l.code() == pick.code()));
+                if (same) continue;
+                int jobId = ls.stream().filter(l -> l.code() == pick.code()).findFirst().orElseThrow().jobId();
+                rows.add(new MapSqlParameterSource("id", e.getKey()).addValue("jobId", jobId));
+            }
+            if (!rows.isEmpty()) {
+                tx.executeWithoutResult(s -> db.batchUpdate("""
+                        UPDATE posting_job SET is_primary = CASE WHEN job_id = :jobId THEN 1 ELSE 0 END
+                         WHERE posting_id = :id
+                        """, rows.toArray(MapSqlParameterSource[]::new)));
+            }
+            log.info("④-2 대표 직무: 공고 {}건 중 {}건을 바꿈 (고른 근거 {})", links.size(), rows.size(), reasons);
+        } catch (RuntimeException e) {
+            log.error("④-2 대표 직무 실패 (회차는 계속): {}", e.toString(), e);
         }
     }
 

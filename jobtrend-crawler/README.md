@@ -2,14 +2,14 @@
 
 사람인 개발 직무 채용공고를 모아 직무별 기술 통계를 만드는 크롤러입니다. API 서버와 따로 도는 앱이고, 결과는 DB 에만 씁니다.
 
-- 대상: 사람인 개발 직무 17개 (`crawler.jobs`, 사람인 직무 코드)
-- 흐름: ① 목록 → ② 마감 처리 → ③ 상세(자격요건·우대·태그) → ④ 기술 추출 → ⑤ 직무별 기술 통계(`job_skill_stat`)
+- 대상: 사람인 개발 직무 23개 (`crawler.jobs`, 사람인 직무 코드). 11/7 에 AI·DevOps·인프라·클라우드·정보보안·임베디드를 뒤에 붙임. 새 직무는 **늘 뒤에** 붙입니다(앞 순서가 `job.sort_order`)
+- 흐름: ① 목록 → ② 마감 처리 → ③ 상세(자격요건·우대·태그) → ④ 기술 추출 → ④-2 대표 직무(`posting_job.is_primary`) → ⑤ 직무별 기술 통계(`job_skill_stat`)
 - 한 번 도는 데 약 6분 (이미 받은 공고는 상세를 다시 받지 않음)
 - 자세한 과정·결과·트러블슈팅은 노션 "크롤링" 아래 1~3차 결과 페이지
 
 ## 실행
 
-Java 21 이 필요합니다. DB 에는 `db/01-schema.sql` 다음에 `db/02-review-fix.sql` 이 적용돼 있어야 합니다 (10/1 검수 뒤 크롤러가 새 칸을 씀).
+Java 21 이 필요합니다. DB 에는 `db/01-schema.sql` 다음에 `db/02-review-fix.sql` 이 적용돼 있어야 합니다 (10/1 검수 뒤 크롤러가 새 칸을 씀). `db/04-primary-job.sql` 이 없으면 ④-2 만 건너뜁니다.
 
 ```bash
 ./gradlew test        # 테스트
@@ -49,6 +49,17 @@ DB 접속은 환경 변수로 줍니다. 비밀번호는 저장소에 올리지 
   - 앞뒤 글 때문에 다른 뜻이 되는 것(Apache Flink·License, Cisco IOS, SAS 스토리지·Expander·HBA, SWIFT 전문·망·MT, Unity Catalog, LLM guard rails, k8s node, DB 커서 등)은 `SkillMatcher.EXCEPT` 에 있습니다. 키는 별칭 표에 있어야 합니다(SeedTest 가 봄).
   - SAS 는 공고 전체로도 가릅니다(`SkillMatcher.dropByContext`): 자격요건·우대사항에 스토리지 낱말(SATA·NVMe·SSD·HDD·SCSI·HBA·RAID·스토리지·펌웨어)이 있고 통계 낱말(SPSS·STATA·통계·데이터 분석·SAS/STAT·Viya·Base SAS·`SAS, R` 등)이 없으면 SAS 를 뺍니다.
 - `saramin_codes.csv`: 사람인 IT 코드표
+
+## 대표 직무 (④-2)
+
+공고의 직무 연결(`posting_job`)은 사람인 직무 목록에 나온 대로이고, 그 목록은 회사가 공고에 고른 직무 태그 그대로입니다. 회사가 직무를 넓게 고르면(관제 공고에 '데이터 사이언티스트') 카드 맨 앞 직무가 엉뚱해집니다. 그래서 연결은 그대로 두고 공고마다 대표 하나만 `is_primary = 1` 로 적습니다(`PrimaryJob`).
+
+1. 연결이 하나면 그것
+2. 제목 낱말이 맞는 연결된 직무. 여럿이면 `PrimaryJob.TITLE_RULES` 에서 위에 있는 것(좁은 직무가 위: 'AI 백엔드' 는 백엔드)
+3. 상세 태그 순서(회사가 고른 순서)에서 처음 나오는 연결된 직무
+4. 상세가 없으면 직무 순서
+
+대표는 늘 연결된 직무 중 하나입니다. 통계(⑤)는 대표 직무를 보지 않습니다. `crawler.jobs` 에 직무를 넣으면 `TITLE_RULES` 에도 넣어야 합니다(PrimaryJobTest 가 봄).
 
 ## 지킬 것
 

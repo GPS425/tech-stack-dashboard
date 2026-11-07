@@ -30,7 +30,7 @@ public class PostingTagRepository {
                 + "FROM posting_job pj "
                 + "JOIN job j ON j.job_id = pj.job_id "
                 + "WHERE pj.posting_id IN (" + placeholders + ") "
-                + "ORDER BY pj.posting_id, j.sort_order";
+                + "ORDER BY pj.posting_id, pj.is_primary DESC, j.sort_order";
 
         return jdbcTemplate.query(sql,
                 (rs, rowNum) -> new Tag(rs.getLong("posting_id"), rs.getString("name")),
