@@ -17,5 +17,7 @@ public record PostingDetail(long postingId,
                             String url,
                             String education,
                             boolean closed,
-                            Double matchRate) {
+                            Double matchRate,
+                            List<String> requiredSkills,
+                            List<String> preferredSkills) {
 }

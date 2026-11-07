@@ -39,6 +39,7 @@ public interface PostingRepository extends JpaRepository<Posting, Long> {
             + "              when (select count(distinct k) from p.skillIds k where exists (select 1 from Skill s where s.id = k and s.active = 1)) = 0 then 0.0 "
             + "              else (select count(distinct k) from p.skillIds k where k in :mySkillIds and exists (select 1 from Skill s where s.id = k and s.active = 1)) * 1.0 "
             + "                   / (select count(distinct k) from p.skillIds k where exists (select 1 from Skill s where s.id = k and s.active = 1)) end desc, "
+            + "         case when :matchingSort = false then 0 else (select count(distinct k) from p.skillIds k where k in :mySkillIds and exists (select 1 from Skill s where s.id = k and s.active = 1)) end desc, "
             + "         case when :deadlineSort = false then 0 "
             + "              when p.deadlineOn is null then 1 "
             + "              when p.deadlineOn < :today then 2 "

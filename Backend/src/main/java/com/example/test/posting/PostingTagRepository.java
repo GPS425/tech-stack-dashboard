@@ -11,18 +11,18 @@ public class PostingTagRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public record Tag(long postingId, String name){
+    public record Tag(long postingId, String name) {
     }
 
-    public record SkillIdTag(long postingId, int skillId){
+    public record SkillIdTag(long postingId, int skillId) {
     }
 
-    public PostingTagRepository(JdbcTemplate jdbcTemplate){
+    public PostingTagRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<Tag> findJobNames(List<Long> postingIds){
-        if(postingIds.isEmpty()){
+    public List<Tag> findJobNames(List<Long> postingIds) {
+        if (postingIds.isEmpty()) {
             return List.of();
         }
         String placeholders = String.join(",", Collections.nCopies(postingIds.size(), "?"));
@@ -37,8 +37,8 @@ public class PostingTagRepository {
                 postingIds.toArray());
     }
 
-    public List<Tag> findSkillNames(List<Long> postingIds){
-        if(postingIds.isEmpty()){
+    public List<Tag> findSkillNames(List<Long> postingIds) {
+        if (postingIds.isEmpty()) {
             return List.of();
         }
         String placeholders = String.join(",", Collections.nCopies(postingIds.size(), "?"));
@@ -53,8 +53,20 @@ public class PostingTagRepository {
                 postingIds.toArray());
     }
 
-    public List<SkillIdTag> findSkillIds(List<Long> postingIds){
-        if(postingIds.isEmpty()){
+    public List<String> findSkillNamesBySource(long postingId, String source) {
+        String sql = "SELECT DISTINCT k.skill_id, k.name "
+                + "FROM posting_skill ps "
+                + "JOIN skill k ON k.skill_id = ps.skill_id AND k.is_active = 1 "
+                + "WHERE ps.posting_id = ? AND ps.source = ? "
+                + "ORDER BY k.skill_id";
+
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> rs.getString("name"),
+                postingId, source);
+    }
+
+    public List<SkillIdTag> findSkillIds(List<Long> postingIds) {
+        if (postingIds.isEmpty()) {
             return List.of();
         }
         String placeholders = String.join(",", Collections.nCopies(postingIds.size(), "?"));

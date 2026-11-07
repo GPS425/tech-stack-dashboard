@@ -243,6 +243,8 @@ public class PostingController {
         Map<Long, List<String>> skillById = groupByPosting(tagRepository.findSkillNames(ids));
         List<String> jobs = jobsById.getOrDefault(p.getId(), List.of());
         List<String> skills = skillById.getOrDefault(p.getId(), List.of());
+        List<String> requiredSkills = tagRepository.findSkillNamesBySource(p.getId(),"REQUIRED");
+        List<String> preferredSkills = tagRepository.findSkillNamesBySource(p.getId(), "PREFERRED");
 
         List<String> mySkillNames = mySkills == null ? List.of()
                 : mySkills.stream()
@@ -277,7 +279,9 @@ public class PostingController {
                 p.getUrl(),
                 p.getEducation(),
                 p.getClosed() != null && p.getClosed() == 1,
-                calcMatchRate(!mySkillNames.isEmpty(), mySkillIds, postingSkillIds)
+                calcMatchRate(!mySkillNames.isEmpty(), mySkillIds, postingSkillIds),
+                requiredSkills,
+                preferredSkills
         );
     }
 }

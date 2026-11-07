@@ -23,7 +23,7 @@
 | 4 | GET | /api/trends/combinations | 함께 요구되는 기술 짝 ✅ 구현 |
 | 5 | POST | /api/analysis | 내 기술로 직무 적합도 분석 ✅ 구현 |
 | 6 | GET | /api/postings | 공고 목록 (검색·필터·정렬·쪽) ✅ 구현 (`sort=matching`·`mySkills`·`matchRate` 포함) |
-| 6 | GET | /api/postings/{postingId} | 공고 상세 ✅ 구현 (`mySkills`·`matchRate` 포함) |
+| 6 | GET | /api/postings/{postingId} | 공고 상세 ✅ 구현 (`mySkills`·`matchRate`·`requiredSkills`·`preferredSkills` 포함) |
 
 ## 공통 규칙
 
@@ -204,7 +204,7 @@
 | `career` | `NEW` | `NEW`(신입 가능: 신입·신입/경력·경력무관) · `EXP1` · `EXP3` · `EXP5`(최소 경력 N년 이상 요구) |
 | `employment` | `정규직` | 고용 형태 (포함 검색: `정규직` 은 "정규직, 계약직" 도 찾음) |
 | `region` | `서울` | 시·도 (`region` 칸에 이 글자가 포함된 공고. 여러 지역이 적힌 공고도 포함) |
-| `sort` | `latest` | `latest`(접수 시작일 최신순, 기본. 시작일이 미래인 "접수 예정" 공고는 맨 뒤로 가고, 접수가 시작된 공고가 먼저 옵니다) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치율 높은 순, 같으면 최신순. `mySkills` 필요. 없으면 400 `MY_SKILLS_REQUIRED`) |
+| `sort` | `latest` | `latest`(접수 시작일 최신순, 기본. 시작일이 미래인 "접수 예정" 공고는 맨 뒤로 가고, 접수가 시작된 공고가 먼저 옵니다) · `deadline`(마감 임박순: 마감일이 오늘 이후인 공고 → 마감일 없는 공고 → 마감일이 오늘 이전인 공고) · `matching`(내 기술 일치율 높은 순, 같으면 일치한 기술 수 많은 순, 그래도 같으면 최신순. `mySkills` 필요. 없으면 400 `MY_SKILLS_REQUIRED`) |
 | `mySkills` | `Java,Spring` | 일치율 계산용. 기술 이름을 쉼표로 여러 개(최대 50개). 별칭(`skill_alias`)도 인정하고, 모르는 이름은 무시합니다 |
 | `page` · `size` | `1` · `10` | 쪽 (`page` 는 1~100000, `size` 는 1~50) |
 
@@ -250,9 +250,12 @@
   "postedOn": "2026-11-04", "deadlineOn": "2026-12-03", "deadlineType": "DATE",
   "url": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55473223",
   "education": "대졸(4년제) 이상", "closed": false,
-  "matchRate": null
+  "matchRate": null,
+  "requiredSkills": ["AWS"], "preferredSkills": ["Azure", "GCP"]
 }
 ```
+
+- `requiredSkills`·`preferredSkills`: 공고에서 **필수**·**우대**로 구분해 수집한 기술 이름(활성 기술만, 기술 번호 순). 구분 없이 태그로만 수집된 기술은 `skills` 에만 있고 두 목록에는 없어서, 둘 다 `[]` 인 공고도 많습니다. `skills` 는 두 목록과 태그를 모두 합친 전체 목록이라 그대로 둡니다.
 
 쿼리 파라미터(선택)
 - `mySkills` (여러 번 가능): 내가 가진 기술. 주면 목록과 같은 계산으로 `matchRate`(0~100) 를 돌려주고, 안 주면 `null`. 예: `/api/postings/55473308?mySkills=Java&mySkills=Spring` → 기술 8개 중 2개 일치 → `25.0`
