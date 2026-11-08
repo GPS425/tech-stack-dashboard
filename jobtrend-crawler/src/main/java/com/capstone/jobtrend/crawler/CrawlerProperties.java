@@ -20,5 +20,8 @@ public record CrawlerProperties(
         @DefaultValue("0") int maxListPages,                 // 직무마다 받을 목록 쪽 수
         @DefaultValue("0") int maxDetails,                   // 한 번에 받을 상세 수
         @DefaultValue("7") int rawKeepDays,                  // 마감 뒤 raw 파일 보관 기간
-        @DefaultValue("10") int maxConsecutiveFailures       // 상세가 연달아 이만큼 실패하면 그날 수집을 멈춘다
+        @DefaultValue("10") int maxConsecutiveFailures,      // 상세가 연달아 이만큼 실패하면 그날 수집을 멈춘다
+        @DefaultValue("") String devExport,                 // 비어 있지 않으면 개발용 데이터(기준 데이터·통계)를 이 JSON 파일로 쓰고 끝낸다
+        @DefaultValue("") String statusFile,                // 대시보드용 상태 파일. 비어 있으면 raw 폴더 옆 status.json
+        @DefaultValue("") String statusOnce                 // 비어 있지 않으면 상태 파일을 이 경로에 한 번 쓰고 끝낸다(읽기만)
 ) {}
