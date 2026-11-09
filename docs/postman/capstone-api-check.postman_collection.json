@@ -1,0 +1,44 @@
+{
+  "info": {
+    "name": "캡스톤 API 전체 확인",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    { "name": "01 health", "request": { "method": "GET", "url": "{{base}}/api/health" } },
+    { "name": "02 health/db", "request": { "method": "GET", "url": "{{base}}/api/health/db" } },
+    { "name": "03 jobs", "request": { "method": "GET", "url": "{{base}}/api/jobs" } },
+    { "name": "04 skills 검색", "request": { "method": "GET", "url": "{{base}}/api/skills?q=spr&limit=20" } },
+    { "name": "05 summary", "request": { "method": "GET", "url": "{{base}}/api/summary" } },
+    { "name": "06 직무별 기술 순위", "request": { "method": "GET", "url": "{{base}}/api/jobs/1/skills?limit=5" } },
+    { "name": "07 job-demand", "request": { "method": "GET", "url": "{{base}}/api/trends/job-demand" } },
+    { "name": "08 matrix", "request": { "method": "GET", "url": "{{base}}/api/trends/matrix?jobIds=1,23,35&limit=6" } },
+    { "name": "09 combinations", "request": { "method": "GET", "url": "{{base}}/api/trends/combinations?jobId=1&limit=5" } },
+    {
+      "name": "10 analysis",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"jobId\": 1, \"skills\": [\"Java\", \"Spring\", \"MySQL\"] }" },
+        "url": "{{base}}/api/analysis"
+      }
+    },
+    { "name": "11 postings 목록", "request": { "method": "GET", "url": "{{base}}/api/postings?jobIds=1&page=1&size=15" } },
+    { "name": "12 postings 맞춤 정렬", "request": { "method": "GET", "url": "{{base}}/api/postings?sort=matching&mySkills=Java,Spring,MySQL,Docker,AWS&page=1&size=15" } },
+    { "name": "13 postings 상세", "request": { "method": "GET", "url": "{{base}}/api/postings/55503654?mySkills=Java&mySkills=Spring" } }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('상태 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('응답 1초 이내', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+        ]
+      }
+    }
+  ]
+}

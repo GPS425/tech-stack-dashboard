@@ -24,9 +24,13 @@ public class CrawlScheduler implements ApplicationRunner {
     private final ReportService report;
     private final CrawlerProperties props;
     private final ConfigurableApplicationContext context;
+    private final DevDataExport devExport;
+    private final StatusFile statusFile;
 
     public CrawlScheduler(CrawlService crawl, ReportService report, CrawlerProperties props,
-                          ConfigurableApplicationContext context) {
+                          ConfigurableApplicationContext context, DevDataExport devExport, StatusFile statusFile) {
+        this.devExport = devExport;
+        this.statusFile = statusFile;
         this.crawl = crawl;
         this.report = report;
         this.props = props;
@@ -35,6 +39,14 @@ public class CrawlScheduler implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
+        if (!props.devExport().isBlank()) {                  // 팀원 개발용 데이터만 뽑고 끝낸다(읽기만)
+            devExport.export(java.nio.file.Path.of(props.devExport()));
+            System.exit(SpringApplication.exit(context, () -> 0));
+        }
+        if (!props.statusOnce().isBlank()) {                 // 대시보드 상태 파일만 한 번 쓰고 끝낸다(읽기만)
+            statusFile.write(java.nio.file.Path.of(props.statusOnce()));
+            System.exit(SpringApplication.exit(context, () -> 0));
+        }
         if (!props.reportFile().isBlank()) {                 // 보고서 숫자만 뽑고 끝낸다(수집 안 함)
             report.export(java.nio.file.Path.of(props.reportFile()));
             System.exit(SpringApplication.exit(context, () -> 0));

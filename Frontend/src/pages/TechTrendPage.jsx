@@ -19,8 +19,8 @@ const ICONS = {
   JavaScript: "javascript", TypeScript: "typescript", "Node.js": "node",
   Docker: "docker", Kubernetes: "kubernetes", Linux: "linux",
 };
-// 위쪽 직무 필터 id -> 실제 직무 이름(/api/jobs 의 name). AI 엔지니어는 DB 에 없는 직무라 넣지 않는다
-const FILTER_JOB_NAME = { backend: "백엔드/서버개발", frontend: "프론트엔드", "data-analyst": "데이터분석가", fullstack: "풀스택" };
+// 위쪽 직무 필터 id -> 실제 직무 이름(/api/jobs 의 name). ai 는 DB 에 AI(인공지능) 직무가 생기면 탭이 나타난다
+const FILTER_JOB_NAME = { backend: "백엔드/서버개발", frontend: "프론트엔드", "data-analyst": "데이터분석가", ai: "AI(인공지능)", fullstack: "풀스택" };
 const iconOf = (name) => ICONS[name] || name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 function TrendHeading({ id, icon, title, description, children }) {
@@ -79,7 +79,7 @@ function TechTrendPage({ onEditSkills, onViewAnalysis, onNavigateDashboard, onBr
   }, []);
 
   // 기술 조합 TOP 5: 직무 필터가 바뀔 때마다 다시 불러온다.
-  // filterJobId: null = 전체(jobId 없이), 숫자 = 그 직무, undefined = 직무 목록이 아직 없거나 DB 에 없는 직무(AI 엔지니어)
+  // filterJobId: null = 전체(jobId 없이), 숫자 = 그 직무, undefined = 직무 목록이 아직 없거나 DB 에 없는 직무
   const filterJobId = selectedJob === "all" ? null : jobs.find((item) => item.name === FILTER_JOB_NAME[selectedJob])?.jobId;
   // 위쪽 직무 탭을 바꾸면 인기 기술 TOP 5 의 직무도 같이 바꾼다(전체일 때는 그대로 둔다). 아래 드롭다운으로 다른 직무를 직접 고를 수도 있다
   useEffect(() => { if (typeof filterJobId === "number") setRankingJobId(filterJobId); }, [filterJobId]);

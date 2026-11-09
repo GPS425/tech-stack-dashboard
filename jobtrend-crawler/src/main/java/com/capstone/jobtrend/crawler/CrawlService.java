@@ -41,7 +41,7 @@ import com.capstone.jobtrend.crawler.ListPageParser.ListPage;
 import com.capstone.jobtrend.crawler.SaraminClient.BlockedException;
 
 /**
- * 하루 한 번의 수집: ① 목록 → ② 마감 처리 → ③ 상세 → ④ 기술 추출 → ⑤ 집계(StatService).
+ * 하루 한 번의 수집: ① 목록 → ② 마감 처리 → ③ 상세 → ④ 기술 추출 → ④-2 대표 직무(PrimaryJob) → ⑤ 집계(StatService).
  * 사람인에 요청하는 곳은 ①과 ③뿐이고 SaraminClient 를 지난다. 공고 하나가 끝날 때마다 바로 저장한다.
  * 쿼리는 설계 문서(캡스톤_DB_설계.html)의 단계별 쿼리를 그대로 옮겼다.
  */
@@ -70,7 +70,9 @@ public class CrawlService {
     static class Counts {
         int list;
         int newPostings;
-        int closed;
+        int closed;             // 합계 = 아래 둘
+        int closedDeadline;     // 마감일이 지나서 닫음 (정상)
+        int closedUnseen;       // 마감일 전인데 목록에서 사라져 닫음 (조기 마감·삭제, 갑자기 많으면 목록 이상)
         int detailOk;
         int fail;
         int skillPostings;
@@ -78,6 +80,19 @@ public class CrawlService {
         int excluded;
         int skipped;            // 제목·회사명이 비어 새로 넣지 못한 목록 항목
         int deadlineUnknown;    // 처음 보는 마감 표기(마감 종류를 바꾸지 않음)
+        int step = 1;           // 지금 하는 단계 ①~⑤. 중단되면 어디서 멈췄는지 남긴다
+        int detailPlanned;      // ③에서 받을 상세 수
+    }
+
+    /** 대시보드 상태 파일이 읽는 단계 표시. 중단된 회차의 메모 앞에도 붙는다 */
+    static String stageText(Counts c) {
+        return switch (c.step) {
+            case 1 -> "① 목록 받는 중";
+            case 2 -> "② 마감 처리 중";
+            case 3 -> "③ 상세 받는 중 " + (c.detailOk + c.fail) + "/" + c.detailPlanned;
+            case 4 -> "④ 기술 추출 중";
+            default -> "⑤ 집계 중";
+        };
     }
 
     private final NamedParameterJdbcTemplate db;
@@ -85,6 +100,7 @@ public class CrawlService {
     private final CrawlerProperties props;
     private final SeedLoader seed;
     private final StatService stats;
+    private final StatusFile statusFile;
     private final SaraminClient client = new SaraminClient();
     private final ListPageParser listParser = new ListPageParser();
     private final DetailPageParser detailParser = new DetailPageParser();
@@ -93,12 +109,13 @@ public class CrawlService {
     private volatile Beat beat = Beat.NONE;                    // 지금 도는 회차의 살아 있음 표시
 
     public CrawlService(NamedParameterJdbcTemplate db, TransactionTemplate tx, CrawlerProperties props,
-                        SeedLoader seed, StatService stats) {
+                        SeedLoader seed, StatService stats, StatusFile statusFile) {
         this.db = db;
         this.tx = tx;
         this.props = props;
         this.seed = seed;
         this.stats = stats;
+        this.statusFile = statusFile;
         this.rawStore = new RawStore(Path.of(props.rawDir()));
         JdbcTemplate jt = new JdbcTemplate(db.getJdbcTemplate().getDataSource());
         jt.setQueryTimeout(30);
@@ -173,6 +190,7 @@ public class CrawlService {
                         new MapSqlParameterSource("now", now()).addValue("id", runId));
                 if (n == 0) b.taken = true;
                 else b.lastOkMillis = System.currentTimeMillis();
+                if (n > 0 && !props.localOnly()) statusFile.refresh();   // 대시보드: 단계가 길어도 5분마다 살아 있음
             } catch (Throwable e) {                            // Error 로 죽으면 다음 표시가 조용히 멈추므로 다 잡는다
                 log.warn("살아 있음 표시 실패: {}", e.toString());
             }
@@ -197,11 +215,12 @@ public class CrawlService {
                 """, new MapSqlParameterSource("list", c.list).addValue("detail", c.detailOk)
                 .addValue("closed", c.closed).addValue("fail", c.fail).addValue("now", now())
                 .addValue("note", cut(runNote(c, note), 500), Types.VARCHAR).addValue("id", runId));
+        if (!props.localOnly()) statusFile.refresh();
     }
 
     /** new_cnt 는 설계대로 "상세를 받은 공고"다. 목록에서 새로 만든 공고 수는 메모에 남긴다. */
     static String runNote(Counts c, String note) {
-        String base = "새 공고 " + c.newPostings;
+        String base = "새 공고 " + c.newPostings + (c.closed > 0 ? " · " + closedText(c) : "");
         if (c.skipped > 0) base += " · 제목·회사명 없어 건너뜀 " + c.skipped;
         if (c.deadlineUnknown > 0) base += " · 처음 보는 마감 표기 " + c.deadlineUnknown;
         return note == null ? base : base + " · " + note;
@@ -230,6 +249,7 @@ public class CrawlService {
         long runId = key.getKey().longValue();
         Beat beat = startHeartbeat(runId);
         this.beat = beat;
+        if (!props.localOnly()) statusFile.refresh();            // 대시보드: 수집 시작
         log.info("수집 시작 #{} (직무 {}, 목록 한도 {}쪽, 상세 한도 {}건)", runId, props.jobs(),
                 props.maxListPages(), props.maxDetails());
 
@@ -249,12 +269,18 @@ public class CrawlService {
                 db.update("UPDATE crawl_run SET list_complete = :v WHERE run_id = :id",
                         new MapSqlParameterSource("v", complete ? 1 : 0).addValue("id", runId));
                 saveCounts(runId, c, "① 목록 끝");
+                c.step = 2;
                 note = closePostings(runStart, incompleteJobs, c);
                 saveCounts(runId, c, "② 마감 끝" + (note == null ? "" : " · " + note));
                 fetchDetails(c, runId, note);
                 saveCounts(runId, c, "③ 상세 끝" + (note == null ? "" : " · " + note));
             }
-            extractSkills(c);
+            c.step = 4;
+            if (!props.localOnly()) saveCounts(runId, c, "④ 기술 추출 중" + (note == null ? "" : " · " + note));
+            Map<Long, List<Integer>> tagCodes = extractSkills(c);
+            markPrimaryJobs(tagCodes);
+            c.step = 5;
+            if (!props.localOnly()) saveCounts(runId, c, "⑤ 집계 중" + (note == null ? "" : " · " + note));
             stats.calculate(LocalDate.now(SEOUL));
             status = "DONE";
         } catch (StopRun e) {
@@ -285,7 +311,9 @@ public class CrawlService {
                          WHERE run_id = :id AND status = 'RUNNING'
                         """, new MapSqlParameterSource("list", c.list).addValue("detail", c.detailOk)
                         .addValue("closed", c.closed).addValue("fail", c.fail).addValue("now", now())
-                        .addValue("note", cut(runNote(c, note), 500), Types.VARCHAR)
+                        // 중단이면 어느 단계에서 멈췄는지 원인 앞에 남긴다(대시보드가 읽음)
+                        .addValue("note", cut(runNote(c, "DONE".equals(status) || props.localOnly() ? note
+                                : stageText(c) + (note == null ? "" : " · " + note)), 500), Types.VARCHAR)
                         .addValue("status", status).addValue("id", runId)) == 1;
                 if (!recorded) log.warn("회차 #{} 는 다른 곳이 이미 정리해서 끝 상태를 적지 않음", runId);
             } catch (RuntimeException e) {
@@ -295,8 +323,23 @@ public class CrawlService {
             log.info("수집 끝 #{} {}: 목록 {}건(새 공고 {}, 끝까지 받음 {}), 마감 {}, 상세 성공 {} 실패 {}, 기술 추출 {}건(raw 없음 {})",
                     runId, status, c.list, c.newPostings, complete, c.closed, c.detailOk, c.fail,
                     c.skillPostings, c.rawMissing);
+            if (!props.localOnly()) statusFile.refresh();            // 대시보드: 끝 상태
         }
         return "DONE".equals(status) && recorded;
+    }
+
+    /** 중단 원인(예외 전문·SQL)이 상태 파일에 그대로 나가지 않게 첫 줄만 짧게 */
+    static String shortNote(String note) {
+        if (note == null) return "(원인 없음)";
+        String first = note.lines().findFirst().orElse(note);
+        int sql = first.indexOf("; bad SQL grammar");
+        if (sql > 0) first = first.substring(0, sql) + " (SQL 문법 오류)";
+        return first.length() > 200 ? first.substring(0, 200) + "…" : first;
+    }
+
+    /** 마감 75 (마감일 지남 70 · 목록에서 사라짐 5) */
+    static String closedText(Counts c) {
+        return "마감 " + c.closed + " (마감일 지남 " + c.closedDeadline + " · 목록에서 사라짐 " + c.closedUnseen + ")";
     }
 
     // ---------- ① 목록 ----------
@@ -563,7 +606,7 @@ public class CrawlService {
                  WHERE is_closed = 1 AND last_seen_at >= :runStart
                 """, p);
         // 마감일이 지났고 이번 목록에 없는 공고: 목록을 다 못 받은 날에도 닫는다
-        c.closed += db.update("""
+        c.closedDeadline += db.update("""
                 UPDATE posting SET is_closed = 1, closed_at = :now
                  WHERE is_closed = 0 AND last_seen_at < :runStart AND deadline_on < :today
                 """, p);
@@ -573,7 +616,7 @@ public class CrawlService {
             // 그래서 아래 검사가 보는 것은 '이번에 처음 안 보인 공고'뿐이다. 잘못 닫아도 다시 보이면 위에서 되살린다
             p.addValue("prevStart", previousCompleteRun(db, runStart));
             int longGone = db.update("UPDATE posting p SET is_closed = 1, closed_at = :now WHERE " + LONG_GONE, p);
-            c.closed += longGone;
+            c.closedUnseen += longGone;
             int longGoneLinks = db.update("DELETE FROM posting_job pj WHERE " + LONG_GONE_LINK, p);
             if (longGone > 0 || longGoneLinks > 0) {
                 log.info("② 두 번 이어서 안 보인 공고 {}건을 닫고, 직무 연결 {}건을 끊음", longGone, longGoneLinks);
@@ -614,7 +657,7 @@ public class CrawlService {
                 note = join(note, "직무 " + badJob + "건이 처음 안 보여 10%를 넘음. 이번에는 닫지 않음(다음에도 없으면 닫음)");
                 log.warn("② {}", note);
             } else {
-                c.closed += db.update("""
+                c.closedUnseen += db.update("""
                         UPDATE posting p SET is_closed = 1, closed_at = :now
                          WHERE is_closed = 0 AND last_seen_at < :runStart AND""" + held.formatted("p"), p);
                 note = unlinkMovedPostings(p, note);
@@ -628,7 +671,8 @@ public class CrawlService {
                    AND EXISTS (SELECT 1 FROM posting_job k WHERE k.posting_id = pj.posting_id AND k.job_id IN (:active))
                 """, p);
         if (removedLinks > 0) log.info("② 설정에서 뺀 직무와의 연결 {}건을 끊음", removedLinks);
-        log.info("② 마감 {}건, 되살림 {}건{}", c.closed, revived,
+        c.closed = c.closedDeadline + c.closedUnseen;
+        log.info("② {}, 되살림 {}건{}", closedText(c), revived,
                 incompleteJobs.isEmpty() ? "" : anyComplete ? " (덜 받은 직무 " + incompleteJobs.size() + "개는 마감일 지난 것만 닫음)"
                         : " (목록을 덜 받아 마감일 지난 것만 닫음)");
         return note;
@@ -737,6 +781,10 @@ public class CrawlService {
         int total = targets.size();
         if (props.maxDetails() > 0 && targets.size() > props.maxDetails()) targets = targets.subList(0, props.maxDetails());
         log.info("③ 상세 대상 {}건 중 {}건", total, targets.size());
+        int planned = targets.size();
+        c.step = 3;
+        c.detailPlanned = planned;
+        saveCounts(runId, c, "③ 상세 받는 중 0/" + planned + (note == null ? "" : " · " + note));
         int consecutive = 0;
         int probes = 0;
         // 공고의 실패 횟수(3번이면 쉼)에는 그 공고 탓인 실패(형식 다름·4xx 등)를 바로 넣는다.
@@ -777,7 +825,7 @@ public class CrawlService {
             }
             if (c.detailOk > 0 && c.detailOk % 100 == 0) {
                 log.info("③ {}건 받음", c.detailOk);
-                saveCounts(runId, c, "③ 상세 받는 중" + (note == null ? "" : " · " + note));
+                saveCounts(runId, c, "③ 상세 받는 중 " + (c.detailOk + c.fail) + "/" + planned + (note == null ? "" : " · " + note));
             }
         }
     }
@@ -847,7 +895,9 @@ public class CrawlService {
 
     // ---------- ④ 기술 추출 ----------
 
-    void extractSkills(Counts c) {
+    /** 돌려주는 것: 원본을 읽은 공고의 상세 태그 코드(나온 순서). 대표 직무 단계가 쓴다 */
+    Map<Long, List<Integer>> extractSkills(Counts c) {
+        Map<Long, List<Integer>> tagCodes = new HashMap<>();
         List<SkillMatcher.Alias> aliases = new ArrayList<>();
         Map<String, Integer> byName = new HashMap<>();          // 태그 이름 → 기술 (글에서 안 찾는 별칭도)
         db.query("SELECT alias, skill_id, text_match FROM skill_alias", rs -> {
@@ -896,6 +946,7 @@ public class CrawlService {
             Set<Integer> tag = new LinkedHashSet<>();
             Set<Integer> codes = new HashSet<>();
             raw.get().tags().forEach(t -> codes.add(t.code()));
+            tagCodes.put(id, raw.get().tags().stream().map(Tag::code).toList());
             for (Tag t : raw.get().tags()) {
                 // AIX(193) 태그는 대부분 'AI(인공지능)'과 같이 붙은 오탐이다(9/29 검수: 33건 중 27건). 유닉스 계열 태그가 같이 있을 때만 인정
                 if (t.code() == AIX_CODE && codes.stream().noneMatch(UNIX_CODES::contains)) continue;
@@ -932,6 +983,65 @@ public class CrawlService {
                     .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                     .limit(40).map(e -> e.getKey() + "(" + e.getValue() + ")").reduce((a, b) -> a + ", " + b).orElse("");
             log.info("④ 기술로 못 맞춘 태그 {}종 (많은 순): {}", unmatchedTags.size(), top);
+        }
+        return tagCodes;
+    }
+
+    // ---------- ④-2 대표 직무 ----------
+
+    /** posting_job.is_primary 가 있는지(db/04-primary-job.sql). 없으면 대표 직무 단계를 건너뛴다 */
+    private boolean hasPrimaryColumn() {
+        Integer n = db.queryForObject("""
+                SELECT COUNT(*) FROM user_tab_columns WHERE table_name = 'POSTING_JOB' AND column_name = 'IS_PRIMARY'
+                """, new MapSqlParameterSource(), Integer.class);
+        return n != null && n > 0;
+    }
+
+    /**
+     * 진행 중 공고마다 대표 직무 하나를 posting_job.is_primary = 1 로 적는다(PrimaryJob). 연결 자체는 바꾸지 않는다.
+     * 바뀐 공고만 쓴다. 통계(⑤)는 대표 직무를 보지 않는다.
+     * 실패해도 회차는 멈추지 않는다(화면은 1 이 없으면 지금처럼 직무 순서로 보여 준다).
+     */
+    void markPrimaryJobs(Map<Long, List<Integer>> tagCodes) {
+        try {
+            if (!hasPrimaryColumn()) {
+                log.warn("④-2 posting_job.is_primary 칸이 없어 대표 직무를 건너뜀 (db/04-primary-job.sql 적용 필요)");
+                return;
+            }
+            record Link(int jobId, int code, boolean primary) {}
+            Map<Long, String> titles = new HashMap<>();
+            Map<Long, List<Link>> links = new java.util.LinkedHashMap<>();
+            db.query("""
+                    SELECT pj.posting_id, p.title, pj.job_id, j.saramin_code, pj.is_primary
+                      FROM posting_job pj JOIN posting p ON p.posting_id = pj.posting_id JOIN job j ON j.job_id = pj.job_id
+                     WHERE p.is_closed = 0
+                     ORDER BY pj.posting_id, j.sort_order, j.job_id
+                    """, rs -> {
+                long id = rs.getLong(1);
+                titles.put(id, rs.getString(2));
+                links.computeIfAbsent(id, k -> new ArrayList<>()).add(new Link(rs.getInt(3), rs.getInt(4), rs.getInt(5) == 1));
+            });
+            List<MapSqlParameterSource> rows = new ArrayList<>();
+            Map<PrimaryJob.Reason, Integer> reasons = new java.util.EnumMap<>(PrimaryJob.Reason.class);
+            for (Map.Entry<Long, List<Link>> e : links.entrySet()) {
+                List<Link> ls = e.getValue();
+                PrimaryJob.Pick pick = PrimaryJob.pick(titles.get(e.getKey()), tagCodes.getOrDefault(e.getKey(), List.of()),
+                        ls.stream().map(Link::code).toList());
+                reasons.merge(pick.reason(), 1, Integer::sum);
+                boolean same = ls.stream().allMatch(l -> l.primary() == (l.code() == pick.code()));
+                if (same) continue;
+                int jobId = ls.stream().filter(l -> l.code() == pick.code()).findFirst().orElseThrow().jobId();
+                rows.add(new MapSqlParameterSource("id", e.getKey()).addValue("jobId", jobId));
+            }
+            if (!rows.isEmpty()) {
+                tx.executeWithoutResult(s -> db.batchUpdate("""
+                        UPDATE posting_job SET is_primary = CASE WHEN job_id = :jobId THEN 1 ELSE 0 END
+                         WHERE posting_id = :id
+                        """, rows.toArray(MapSqlParameterSource[]::new)));
+            }
+            log.info("④-2 대표 직무: 공고 {}건 중 {}건을 바꿈 (고른 근거 {})", links.size(), rows.size(), reasons);
+        } catch (RuntimeException e) {
+            log.error("④-2 대표 직무 실패 (회차는 계속): {}", e.toString(), e);
         }
     }
 
