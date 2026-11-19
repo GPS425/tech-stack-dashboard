@@ -48,7 +48,7 @@ public class JobSkillController {
                 ? repository.findTopSkillsByCount(jobId)
                 : repository.findTopSkills(jobId, limit);
 
-        // 응답 조립, 전체 공고가 100건보다 작으면 smallSample을 트루로
+        // 응답 조립. 최근 통계의 평균 공고 수가 100건 미만이면 smallSample 은 true (평균 자료가 없으면 이번 공고 수로 판단)
         return ResponseEntity.ok(
                 new JobSkillResponse(jobId, name, calcDate, jobTotal, smallSample, items)
         );

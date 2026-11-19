@@ -2,7 +2,6 @@ package com.example.test.posting;
 
 import com.example.test.common.ApiException;
 import com.example.test.trend.TrendRepository;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,7 +70,7 @@ public class PostingController {
         }
 
         if ("matching".equals(sort) && mySkillNames.isEmpty()) {
-            throw new ApiException(400, "MY_SKILLS_REQUIRED", "sort=matching에는 mySkills가 필요합니다.");
+            throw new ApiException(400, "MY_SKILLS_REQUIRED", "sort=matching에는 mySkills가 필요합니다");
         }
 
         Set<Integer> mySkillIds = mySkillNames.isEmpty() ? Set.of()
