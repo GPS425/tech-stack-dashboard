@@ -23,7 +23,7 @@ export const mockDashboard = {
     { id: "roles", label: "분석 직무", value: jobRoles.length, unit: "개" },
   ],
   footer: {
-    source: "",
+    source: "수집된 채용공고 데이터",
     copyright: "© 2026 JOBSTACK. All rights reserved.",
   },
 };
